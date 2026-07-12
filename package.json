@@ -1,0 +1,23 @@
+{
+  "name": "arx-store-bot",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "deploy-commands": "ts-node src/deploy-commands.ts"
+  },
+  "dependencies": {
+    "@magicyan/discord": "^1.7.3",
+    "@supabase/supabase-js": "^2.103.0",
+    "discord.js": "^14.15.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}

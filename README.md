@@ -1,6 +1,6 @@
 # ARX Store — Bot Manager
 
-Bot Discord do ARX Store. Gerencia assinaturas, ativacao de bots e planos via comandos slash.
+Bot Discord da plataforma ARX Store. Gerencia loja de bots, planos e ativacoes via comandos slash.
 
 ## Comandos
 
@@ -12,18 +12,13 @@ Bot Discord do ARX Store. Gerencia assinaturas, ativacao de bots e planos via co
 | `/desativar` | Desativar bot |
 | `/config` | Configurar bot ativo |
 
+## Deploy (Coolify)
+
+Build pack: **Dockerfile** (esta na raiz)
+Porta: nao expoe (bot conecta via WebSocket)
+
 ## Stack
 
-- discord.js v14
-- @magicyan/discord (Constatic)
-- Supabase (PostgreSQL)
-
-## Deploy
-
-Coolify: Dockerfile na raiz, porta nao exposta (bot-only).
-
-```env
-DISCORD_BOT_TOKEN=
-SUPABASE_SERVICE_ROLE_KEY=
-NEXT_PUBLIC_SUPABASE_URL=https://supabase.arxdevs.xyz
-```
+- discord.js v14.15.3
+- @magicyan/discord 1.7.3
+- TypeScript + Supabase
