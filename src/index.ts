@@ -1,7 +1,6 @@
 /**
  * ARX Store Bot — Entry point
  * Arquitetura Constatic: createCommand / createResponder / createEvent
- * https://constatic-docs.vercel.app
  */
 
 import './setup'
@@ -11,10 +10,12 @@ import {
   GatewayIntentBits,
   Events,
   ActivityType,
+  REST,
+  Routes,
 } from 'discord.js'
 
 import { config } from './config'
-import { setupCreators, createEvent } from './base'
+import { setupCreators, createEvent, _commands } from './base'
 
 import './commands/loja'
 import './commands/meuplano'
@@ -37,7 +38,46 @@ createEvent({
   async run(c) {
     console.log(`[ARX STORE] Bot conectado como ${c.user.tag}`)
     setupCreators(client)
+
+    await deployCommands(c)
   },
 })
+
+async function deployCommands(c: Client<true>) {
+  try {
+    const commands = Array.from(_commands.values()).map(cmd => {
+      if (!cmd.data) throw new Error(`Comando sem data: ${(cmd as any).name ?? 'unknown'}`)
+      return cmd.data.toJSON()
+    })
+
+    if (commands.length === 0) {
+      console.log('[DEPLOY] Nenhum comando para registrar.')
+      return
+    }
+
+    const rest = new REST({ version: '10' }).setToken(config.discordToken)
+
+    console.log(`[DEPLOY] Registrando ${commands.length} slash command(s) (Global)...`)
+    await rest.put(
+      Routes.applicationCommands(config.discordClientId),
+      { body: commands }
+    )
+
+    const guildIds = Array.from(c.guilds.cache.keys())
+    if (guildIds.length) {
+      console.log(`[DEPLOY] Limpando guild commands em ${guildIds.length} guild(s)...`)
+      for (const guildId of guildIds) {
+        await rest.put(
+          Routes.applicationGuildCommands(config.discordClientId, guildId),
+          { body: [] }
+        ).catch(e => console.log(`[DEPLOY] WARN: guild ${guildId} — ${e.message}`))
+      }
+    }
+
+    console.log('[DEPLOY] Slash commands registrados com sucesso!')
+  } catch (err) {
+    console.error('[DEPLOY] Erro ao registrar commands:', err)
+  }
+}
 
 client.login(config.discordToken)
