@@ -243,10 +243,10 @@ createResponder({
       .setPlaceholder("Selecione o canal de vendas...")
       .setChannelTypes(ChannelType.GuildText)
 
-    await interaction.reply({
+    await interaction.update({
       content: "Selecione o canal onde o anuncio de venda sera postado:",
+      embeds: [],
       components: [new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(select)],
-      ephemeral: true,
     })
   },
 })
@@ -290,10 +290,10 @@ createResponder({
       .setCustomId(`mgr_roleselect:${botSlug}`)
       .setPlaceholder("Selecione o cargo de cliente...")
 
-    await interaction.reply({
+    await interaction.update({
       content: "Selecione o cargo que sera dado aos clientes apos pagamento:",
+      embeds: [],
       components: [new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(select)],
-      ephemeral: true,
     })
   },
 })
