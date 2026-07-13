@@ -1,7 +1,8 @@
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js'
 import { createCommand, colors } from '../base'
-import { activateBot, canActivateBot } from '../utils/store-queries'
+import { activateBot, canActivateBot, getUserByDiscordId } from '../utils/store-queries'
 import { getBotSupabase } from '../utils/supabase'
+import { loadGuildModules } from '../modules/manager'
 
 createCommand({
   data: new SlashCommandBuilder()
@@ -55,14 +56,14 @@ createCommand({
     }
 
     try {
-      if (!interaction.guildId) {
+      if (!interaction.guildId || !interaction.guild) {
         return interaction.reply({
           content: 'Este comando so pode ser usado em um servidor.',
           ephemeral: true,
         })
       }
 
-      const member = await interaction.guild!.members.fetch(interaction.user.id)
+      const member = await interaction.guild.members.fetch(interaction.user.id)
       if (!member.permissions.has(PermissionFlagsBits.ManageGuild)) {
         return interaction.reply({
           content: 'Voce precisa da permissao **Gerenciar Servidor** para ativar bots.',
@@ -71,6 +72,14 @@ createCommand({
       }
 
       const botSlug = interaction.options.getString('bot', true)
+
+      const user = await getUserByDiscordId(interaction.user.id)
+      if (!user) {
+        return interaction.reply({
+          content: 'Voce precisa ter uma conta na ARX Store para ativar bots.\nCrie sua conta em: https://arx.store',
+          ephemeral: true,
+        })
+      }
 
       const canActivate = await canActivateBot(interaction.user.id, interaction.guildId, botSlug)
       if (!canActivate) {
@@ -83,11 +92,26 @@ createCommand({
         })
       }
 
+      const { data: settings } = await getBotSupabase()
+        .from('settings')
+        .select('value')
+        .eq('key', 'default_bots')
+        .single()
+
+      const bots: any[] = settings?.value
+        ? (Array.isArray(settings.value) ? settings.value : JSON.parse(String(settings.value)))
+        : []
+
+      const botDef = bots.find((b: any) => b.slug === botSlug)
+      const botName = botDef?.name ?? botSlug
+
       await activateBot(interaction.guildId, botSlug)
+
+      await loadGuildModules(interaction.client)
 
       const embed = new EmbedBuilder()
         .setTitle('Bot Ativado')
-        .setDescription(`O bot **${botSlug}** foi ativado com sucesso no servidor!`)
+        .setDescription(`O bot **${botName}** foi ativado com sucesso no servidor!`)
         .addFields({
           name: 'Proximos passos',
           value: 'Use **/config ver bot:' + botSlug + '** para visualizar as configuracoes\n'

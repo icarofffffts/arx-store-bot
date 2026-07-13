@@ -19,6 +19,10 @@ export async function getUserSubscription(userId: string) {
   return data
 }
 
+export async function getActiveSubscription(userId: string) {
+  return getUserSubscription(userId)
+}
+
 export async function getGuildBots(guildId: string) {
   const { data } = await getBotSupabase()
     .from('guild_bots')
@@ -59,6 +63,17 @@ export async function deactivateBot(guildId: string, botSlug: string) {
   return data
 }
 
+export async function deactivateBotById(guildBotId: string) {
+  const { data, error } = await getBotSupabase()
+    .from('guild_bots')
+    .update({ status: 'inactive', deactivated_at: new Date().toISOString() })
+    .eq('id', guildBotId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function getBotConfig(guildId: string, botSlug: string) {
   const { data } = await getBotSupabase()
     .from('guild_bots')
@@ -69,12 +84,32 @@ export async function getBotConfig(guildId: string, botSlug: string) {
   return data?.config ?? null
 }
 
+export async function getGuildBotConfig(guildBotId: string) {
+  const { data } = await getBotSupabase()
+    .from('guild_bots')
+    .select('config')
+    .eq('id', guildBotId)
+    .single()
+  return data?.config ?? null
+}
+
 export async function updateBotConfig(guildId: string, botSlug: string, config: Record<string, unknown>) {
   const { data, error } = await getBotSupabase()
     .from('guild_bots')
     .update({ config })
     .eq('guild_id', guildId)
     .eq('bot_slug', botSlug)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateGuildBotConfig(guildBotId: string, config: Record<string, unknown>) {
+  const { data, error } = await getBotSupabase()
+    .from('guild_bots')
+    .update({ config })
+    .eq('id', guildBotId)
     .select()
     .single()
   if (error) throw error

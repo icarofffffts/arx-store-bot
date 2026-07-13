@@ -9,13 +9,13 @@ import {
   Client,
   GatewayIntentBits,
   Events,
-  ActivityType,
   REST,
   Routes,
 } from 'discord.js'
 
 import { config } from './config'
 import { setupCreators, createEvent, _commands } from './base'
+import { loadGuildModules, refreshGuildModules } from './modules/manager'
 
 import './commands/loja'
 import './commands/meuplano'
@@ -23,12 +23,17 @@ import './commands/ativar'
 import './commands/desativar'
 import './commands/config'
 
+import './modules/tickets'
+import './modules/invites'
+import './modules/moderation'
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildInvites,
   ],
 })
 
@@ -40,6 +45,16 @@ createEvent({
     setupCreators(client)
 
     await deployCommands(c)
+
+    await loadGuildModules(client)
+
+    setInterval(async () => {
+      try {
+        await refreshGuildModules(client)
+      } catch (err) {
+        console.error('[ARX STORE] Erro ao atualizar modulos:', err)
+      }
+    }, 5 * 60 * 1000)
   },
 })
 

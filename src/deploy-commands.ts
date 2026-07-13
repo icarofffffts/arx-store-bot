@@ -8,6 +8,10 @@ import './commands/ativar'
 import './commands/desativar'
 import './commands/config'
 
+import './modules/tickets'
+import './modules/invites'
+import './modules/moderation'
+
 const commands = Array.from(_commands.values()).map(cmd => {
   if (!cmd.data) throw new Error(`Comando sem data: ${cmd.name ?? 'unknown'}`)
   return cmd.data.toJSON()

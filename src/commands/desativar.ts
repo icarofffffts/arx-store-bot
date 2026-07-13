@@ -2,6 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.
 import { createCommand, colors } from '../base'
 import { deactivateBot, getGuildBots } from '../utils/store-queries'
 import { getBotSupabase } from '../utils/supabase'
+import { disableModule } from '../modules/manager'
 
 createCommand({
   data: new SlashCommandBuilder()
@@ -52,14 +53,14 @@ createCommand({
     }
 
     try {
-      if (!interaction.guildId) {
+      if (!interaction.guildId || !interaction.guild) {
         return interaction.reply({
           content: 'Este comando so pode ser usado em um servidor.',
           ephemeral: true,
         })
       }
 
-      const member = await interaction.guild!.members.fetch(interaction.user.id)
+      const member = await interaction.guild.members.fetch(interaction.user.id)
       if (!member.permissions.has(PermissionFlagsBits.ManageGuild)) {
         return interaction.reply({
           content: 'Voce precisa da permissao **Gerenciar Servidor** para desativar bots.',
@@ -79,6 +80,8 @@ createCommand({
       }
 
       await deactivateBot(interaction.guildId, botSlug)
+
+      await disableModule(interaction.client, interaction.guildId, botSlug)
 
       const embed = new EmbedBuilder()
         .setTitle('Bot Desativado')
