@@ -1,15 +1,16 @@
 import {
-  SlashCommandBuilder,
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   Client,
-  Message,
   AttachmentBuilder,
 } from "discord.js"
-import { createCommand, createResponder, createEvent } from "../../base"
+import { createResponder } from "../../base"
 import { getBotSupabase } from "../../utils/supabase"
 import { createPixPayment, getPaymentStatus } from "../../utils/mercadopago"
 
@@ -22,11 +23,8 @@ const PRICING_OPTIONS = [
   { id: "lifetime", label: "Vitalicio", price: 199.90 },
 ]
 
-const pendingTokenSubmissions = new Map<string, { orderId: string }>()
-
 async function getDefaultBots() {
-  const supabase = getBotSupabase()
-  const { data } = await supabase
+  const { data } = await getBotSupabase()
     .from("settings")
     .select("value")
     .eq("key", "default_bots")
@@ -45,10 +43,9 @@ async function getUserByDiscordId(discordId: string) {
 }
 
 async function createOrder(discordId: string, botSlug: string, metadata: any = {}) {
-  const supabase = getBotSupabase()
   const user = await getUserByDiscordId(discordId)
   if (!user) return null
-  const { data: order } = await supabase
+  const { data: order } = await getBotSupabase()
     .from("custom_bot_orders")
     .insert({ user_id: user.id, bot_slug: botSlug, status: "pending", metadata })
     .select()
@@ -60,172 +57,82 @@ async function updateOrder(orderId: string, fields: Record<string, any>) {
   await getBotSupabase().from("custom_bot_orders").update(fields).eq("id", orderId)
 }
 
-async function getPaidOrdersNeedingToken() {
-  const { data } = await getBotSupabase()
-    .from("custom_bot_orders")
-    .select("*, users(discord_id)")
-    .eq("status", "paid")
-    .is("bot_token", null)
-    .limit(10)
-  return data ?? []
-}
-
-async function submitBotToken(orderId: string, botToken: string, clientId: string) {
+async function submitBotDeploy(orderId: string, botToken: string, clientId: string, botName: string) {
   await getBotSupabase()
     .from("custom_bot_orders")
-    .update({ bot_token: botToken, bot_client_id: clientId, status: "deploying" })
+    .update({
+      bot_token: botToken,
+      bot_client_id: clientId,
+      bot_name: botName,
+      status: "deploying",
+    })
     .eq("id", orderId)
 }
 
-async function pollPaymentUntilDone(p: {
+async function pollPayment(p: {
   paymentId: number
   orderId: string
-  client: Client
   guildId: string
   userId: string
   clienteRoleId: string
+  channelId: string
+  client: Client
 }) {
-  const { paymentId, orderId, client, guildId, userId, clienteRoleId } = p
+  const { paymentId, orderId, client, guildId, userId, clienteRoleId, channelId } = p
 
-  for (let attempt = 0; attempt < 72; attempt++) {
+  for (let i = 0; i < 72; i++) {
     await new Promise(r => setTimeout(r, 5000))
     try {
       const status = await getPaymentStatus(paymentId)
+      if (status !== "pending" && status !== "in_process") {
+        if (status === "approved") {
+          await updateOrder(orderId, { status: "paid", mp_payment_id: String(paymentId) })
 
-      if (status === "approved") {
-        await updateOrder(orderId, { status: "paid", mp_payment_id: String(paymentId) })
-
-        if (clienteRoleId) {
-          try {
-            const guild = await client.guilds.fetch(guildId)
-            const member = await guild.members.fetch(userId)
-            await member.roles.add(clienteRoleId)
-            console.log(`[SALES] Cargo ${clienteRoleId} adicionado a ${member.user.tag}`)
-          } catch (e) {
-            console.error("[SALES] Erro ao setar cargo:", e)
+          if (clienteRoleId) {
+            try {
+              const guild = await client.guilds.fetch(guildId)
+              const member = await guild.members.fetch(userId)
+              await member.roles.add(clienteRoleId)
+            } catch {}
           }
-        }
 
-        try {
-          const user = await client.users.fetch(userId)
-          await user.send({
-            embeds: [
-              new EmbedBuilder()
+          try {
+            const channel = await client.channels.fetch(channelId)
+            if (channel && "send" in channel) {
+              const embed = new EmbedBuilder()
                 .setTitle("✅ Pagamento Aprovado!")
                 .setColor(0x22c55e)
                 .setDescription(
-                  "Seu pagamento foi confirmado e o cargo de cliente foi liberado!\n\n" +
-                  "Para ativar seu bot, envie o token e Client ID:\n" +
-                  "`!token SEU_TOKEN_AQUI CLIENT_ID_AQUI`\n\n" +
-                  "**Como obter:** https://discord.com/developers/applications"
-                ),
-            ],
-          }).catch(() => {})
-          pendingTokenSubmissions.set(userId, { orderId })
-        } catch {}
+                  `<@${userId}>, seu pagamento foi confirmado e o cargo de cliente foi liberado!\n\n` +
+                  "Clique no botao abaixo para **ativar seu bot**."
+                )
 
-        return
-      }
+              const activateBtn = new ButtonBuilder()
+                .setCustomId(`activate_bot:${orderId}`)
+                .setLabel("🚀 Ativar Bot")
+                .setStyle(ButtonStyle.Success)
 
-      if (["rejected", "cancelled", "refunded"].includes(status)) {
-        await updateOrder(orderId, { status })
+              await (channel as any).send({
+                content: `<@${userId}>`,
+                embeds: [embed],
+                components: [new ActionRowBuilder<ButtonBuilder>().addComponents(activateBtn)],
+              })
+            }
+          } catch {}
+        }
         return
       }
     } catch {}
   }
 }
 
-createCommand({
-  data: new SlashCommandBuilder()
-    .setName("setup")
-    .setDescription("Configura sistemas do ARX Store")
-    .addSubcommand((s) =>
-      s
-        .setName("loja")
-        .setDescription("Cria painel de vendas de um bot com QR Code Pix")
-        .addStringOption((o) =>
-          o.setName("bot").setDescription("Bot para vender").setRequired(true)
-            .addChoices(
-              { name: "Ticket Bot", value: "ticket" },
-              { name: "Invite Bot", value: "invite" },
-              { name: "Mod Bot", value: "mod" },
-            )
-        )
-        .addRoleOption((o) =>
-          o.setName("cargo_cliente")
-            .setDescription("Cargo dado ao cliente apos pagamento")
-            .setRequired(true)
-        )
-    ),
-  async run(interaction: any) {
-    if (!interaction.guild?.channels) return
-
-    const botSlug = interaction.options.getString("bot", true)
-    const clienteRole = interaction.options.getRole("cargo_cliente", true)
-    const bots = await getDefaultBots()
-    const botMeta = bots.find((b: any) => b.slug === botSlug)
-    if (!botMeta) {
-      return interaction.reply({ content: "Bot nao encontrado nos settings.", ephemeral: true })
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🛒 ${botMeta.name}`)
-      .setDescription(botMeta.description ?? "Adquira este bot para seu servidor")
-      .setColor(0xe11d48)
-      .setThumbnail(interaction.guild.iconURL() ?? null)
-      .addFields(
-        {
-          name: "✨ Funcionalidades",
-          value: ((botMeta.features as string[]) ?? [])
-            .map((f: string, i: number) => `**${i + 1}.** ${f}`)
-            .join("\n") || "Consulte o site",
-        },
-        {
-          name: "💰 Planos",
-          value: (botMeta.pricing ?? PRICING_OPTIONS).map(
-            (p: any) => `**${p.label}** — R$ ${p.price.toFixed(2).replace(".", ",")}`
-          ).join("\n"),
-        },
-        {
-          name: "🏷️ Whitelabel",
-          value: `+R$ ${WHITELABEL_FEE.toFixed(2).replace(".", ",")} para remover marcas ARX do bot`,
-        },
-        {
-          name: "🔧 Como funciona",
-          value:
-            "1. Selecione a duracao\n" +
-            "2. Escolha se quer whitelabel\n" +
-            "3. Pague via PIX (QR Code)\n" +
-            "4. Receba cargo de cliente + ativacao do bot",
-        }
-      )
-      .setFooter({ text: "ARX Store" })
-
-    const select = new StringSelectMenuBuilder()
-      .setCustomId(`sales_buy:${botSlug}:${clienteRole.id}`)
-      .setPlaceholder("Selecione a duracao...")
-      .addOptions(
-        (botMeta.pricing ?? PRICING_OPTIONS).map((p: any) => ({
-          label: `${p.label} — R$ ${p.price.toFixed(2).replace(".", ",")}`,
-          value: `${p.duration ?? p.id}:${p.price}:${p.label}`,
-          emoji: (p.duration ?? p.id) === "lifetime" ? "⭐" : "💳",
-        }))
-      )
-
-    await interaction.reply({
-      embeds: [embed],
-      components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select)],
-    })
-  },
-})
-
 createResponder({
   customId: "sales_buy:**",
   types: ["StringSelect"],
   async run(interaction: any) {
-    const customIdParts = interaction.customId.split(":")
-    const botSlug = customIdParts[1]
-    const clienteRoleId = customIdParts[2]
+    const customParts = interaction.customId.split(":")
+    const botSlug = customParts[1]
+    const clienteRoleId = customParts[2]
 
     const [duration, priceStr, ...labelParts] = interaction.values[0].split(":")
     const label = decodeURIComponent(labelParts.join(":"))
@@ -242,7 +149,7 @@ createResponder({
         `**Duracao:** ${label}\n` +
         `**Preco base:** R$ ${basePrice.toFixed(2).replace(".", ",")}\n` +
         `**Whitelabel:** +R$ ${WHITELABEL_FEE.toFixed(2).replace(".", ",")}\n\n` +
-        "Whitelabel remove todas as marcas ARX do bot. Seu cliente nao ve \"ARX\" em nenhum lugar — parece um bot exclusivo feito so para voce."
+        "Whitelabel remove todas as marcas ARX do bot. Seu cliente nao ve \"ARX\" em lugar nenhum — parece um bot exclusivo."
       )
 
     const payload = `${botSlug}:${duration}:${basePrice}:${encodeURIComponent(label)}:${clienteRoleId}`
@@ -284,7 +191,7 @@ createResponder({
     const user = await getUserByDiscordId(interaction.user.id)
     if (!user?.email) {
       return interaction.editReply({
-        content: "Sua conta nao tem email. Vincule no site primeiro.",
+        content: "Sua conta nao tem email vinculado. Vincule no site primeiro.",
       })
     }
 
@@ -328,7 +235,7 @@ createResponder({
         `**${botMeta?.name ?? botSlug}**\n` +
         `${label}${whitelabel ? " (Whitelabel)" : ""}\n\n` +
         `**Valor:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n\n` +
-        "Escaneie o QR Code ou copie o codigo Pix abaixo.\n" +
+        "Escaneie o QR Code com o app do seu banco.\n" +
         "O QR Code expira em 30 minutos.\n\n" +
         `**Pedido:** #${(order.id as string).slice(0, 8)}`
       )
@@ -336,115 +243,93 @@ createResponder({
 
     const files: AttachmentBuilder[] = []
     if (pixResult.qrCodeBase64) {
-      files.push(new AttachmentBuilder(Buffer.from(pixResult.qrCodeBase64, "base64"), { name: "pix-qrcode.png" }))
+      files.push(new AttachmentBuilder(Buffer.from(pixResult.qrCodeBase64, "base64"), { name: "pix.png" }))
     }
 
     await interaction.editReply({
       embeds: [qrEmbed],
-      components: [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId("pix_copy")
-            .setLabel("📋 Copiar Codigo Pix")
-            .setStyle(ButtonStyle.Secondary)
-        ),
-      ],
       files,
     })
 
-    const msg = await interaction.fetchReply().catch(() => null)
-
-    pollPaymentUntilDone({
+    pollPayment({
       paymentId: pixResult.id,
       orderId: order.id,
       client: interaction.client as Client,
       guildId: interaction.guildId!,
       userId: interaction.user.id,
       clienteRoleId,
+      channelId: interaction.channelId,
     }).catch(() => {})
   },
 })
 
 createResponder({
-  customId: "pix_copy",
+  customId: "activate_bot:**",
   types: ["Button"],
   async run(interaction: any) {
-    const message = interaction.message
-    const embed = message?.embeds?.[0]
-    if (!embed?.description) {
-      return interaction.reply({ content: "Codigo nao encontrado. Tente escanear o QR Code.", ephemeral: true })
-    }
-    await interaction.reply({
-      content: "Para pagar, escaneie o QR Code na mensagem acima usando o app do seu banco.",
-      ephemeral: true,
-    })
+    const orderId = interaction.customId.split(":")[1]
+
+    const modal = new ModalBuilder()
+      .setCustomId(`activate_modal:${orderId}`)
+      .setTitle("Ativar Bot")
+
+    const tokenInput = new TextInputBuilder()
+      .setCustomId("bot_token")
+      .setLabel("Token do Bot")
+      .setPlaceholder("MTMyNDU2Nzg5...")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+
+    const clientIdInput = new TextInputBuilder()
+      .setCustomId("client_id")
+      .setLabel("Client ID do Bot")
+      .setPlaceholder("1234567890123456789")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+
+    const nameInput = new TextInputBuilder()
+      .setCustomId("bot_name")
+      .setLabel("Nome do Bot (opcional)")
+      .setPlaceholder("MeuBot Ticket")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false)
+
+    modal.addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(tokenInput),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(clientIdInput),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+    )
+
+    await interaction.showModal(modal)
   },
 })
 
-createEvent({
-  name: "messageCreate",
-  async run(message: Message) {
-    if (message.author.bot || message.guild) return
-    if (!message.content.startsWith("!token")) return
+createResponder({
+  customId: "activate_modal:**",
+  types: ["Modal"],
+  async run(interaction: any) {
+    const orderId = interaction.customId.split(":")[1]
+    const botToken = interaction.fields.getTextInputValue("bot_token").trim()
+    const clientId = interaction.fields.getTextInputValue("client_id").trim()
+    const botName = interaction.fields.getTextInputValue("bot_name").trim() || ""
 
-    const parts = message.content.split(/\s+/)
-    if (parts.length < 3) {
-      await message.reply("Formato: `!token SEU_TOKEN CLIENT_ID`")
-      return
-    }
-
-    const token = parts[1]
-    const clientId = parts[2]
-    const pending = pendingTokenSubmissions.get(message.author.id)
-    if (!pending) {
-      await message.reply("Nenhum pedido pendente para sua conta.")
-      return
-    }
+    await interaction.deferReply({ ephemeral: true })
 
     try {
-      await submitBotToken(pending.orderId, token, clientId)
-      pendingTokenSubmissions.delete(message.author.id)
-      await message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle("✅ Token Recebido!")
-            .setDescription("Seu bot esta na fila de deploy. Em breve estara online com nossa source!")
-            .setColor(0x22c55e),
-        ],
-      })
-    } catch {
-      await message.reply("Erro ao processar. Tente novamente.")
-    }
-  },
-})
+      await submitBotDeploy(orderId, botToken, clientId, botName)
 
-function initSalesPoller(client: Client) {
-  setInterval(async () => {
-    try {
-      const orders = await getPaidOrdersNeedingToken()
-      for (const order of orders as any[]) {
-        const discordId = order.users?.discord_id
-        if (!discordId || pendingTokenSubmissions.has(discordId)) continue
-        try {
-          const user = await client.users.fetch(discordId)
-          await user.send({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle("✅ Pagamento Aprovado!")
-                .setColor(0x22c55e)
-                .setDescription(
-                  `Seu pedido de **${order.bot_slug}** foi aprovado!\n` +
-                  "Para ativar, envie: `!token SEU_TOKEN CLIENT_ID`"
-                ),
-            ],
-          }).catch(() => {})
-          pendingTokenSubmissions.set(discordId, { orderId: order.id })
-        } catch {}
-      }
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Bot em Deploy!")
+        .setColor(0x22c55e)
+        .setDescription(
+          "Seu bot foi enviado para a fila de deploy!\n\n" +
+          "Em breve ele estara online rodando nossa source no seu token.\n" +
+          "Voce recebera uma DM quando o deploy for concluido."
+        )
+
+      await interaction.editReply({ embeds: [embed] })
     } catch (err) {
-      console.error("[SALES] Erro no poller:", err)
+      await interaction.editReply({ content: "Erro ao processar. Tente novamente." })
     }
-  }, 60_000)
-}
-
-export { initSalesPoller }
+  },
+})

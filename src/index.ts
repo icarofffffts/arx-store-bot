@@ -22,11 +22,12 @@ import './commands/meuplano'
 import './commands/ativar'
 import './commands/desativar'
 import './commands/config'
+import './commands/manager'
 
 import './modules/tickets'
 import './modules/invites'
 import './modules/moderation'
-import { initSalesPoller } from './modules/sales'
+import './modules/sales'
 
 const client = new Client({
   intents: [
@@ -48,8 +49,6 @@ createEvent({
     await deployCommands(c)
 
     await loadGuildModules(client)
-
-    initSalesPoller(client)
 
     setInterval(async () => {
       try {

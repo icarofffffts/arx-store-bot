@@ -7,6 +7,7 @@ import './commands/meuplano'
 import './commands/ativar'
 import './commands/desativar'
 import './commands/config'
+import './commands/manager'
 
 import './modules/tickets'
 import './modules/invites'
