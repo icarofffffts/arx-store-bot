@@ -5,6 +5,11 @@
 
 import './setup'
 
+console.log('[ARX STORE] ===== INICIANDO =====')
+console.log('[ARX STORE] Envs disponiveis:', Object.keys(process.env).filter(k =>
+  k.startsWith('DISCORD') || k.startsWith('SUPABASE') || k.startsWith('NEXT') || k.startsWith('MERCADO')
+).join(', '))
+
 import {
   Client,
   GatewayIntentBits,
@@ -104,4 +109,8 @@ async function deployCommands(c: Client<true>) {
 
 client.login(config.discordToken)
   .then(() => console.log('[ARX STORE] Login request enviado...'))
-  .catch(err => console.error('[ARX STORE] ERRO no login:', err.message))
+  .catch(err => {
+    console.error('[ARX STORE] ERRO no login:', err.message)
+    console.error('[ARX STORE] Token definido:', typeof config.discordToken, config.discordToken ? `com ${config.discordToken.length} chars` : 'NAO DEFINIDO')
+    console.error('[ARX STORE] Client ID:', config.discordClientId)
+  })
