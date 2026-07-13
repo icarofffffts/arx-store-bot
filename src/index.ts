@@ -26,6 +26,7 @@ import './commands/config'
 import './modules/tickets'
 import './modules/invites'
 import './modules/moderation'
+import { initSalesPoller } from './modules/sales'
 
 const client = new Client({
   intents: [
@@ -47,6 +48,8 @@ createEvent({
     await deployCommands(c)
 
     await loadGuildModules(client)
+
+    initSalesPoller(client)
 
     setInterval(async () => {
       try {

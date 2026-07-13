@@ -11,6 +11,7 @@ import './commands/config'
 import './modules/tickets'
 import './modules/invites'
 import './modules/moderation'
+import './modules/sales'
 
 const commands = Array.from(_commands.values()).map(cmd => {
   if (!cmd.data) throw new Error(`Comando sem data: ${cmd.name ?? 'unknown'}`)
