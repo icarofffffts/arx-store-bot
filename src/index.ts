@@ -78,25 +78,19 @@ async function deployCommands(c: Client<true>, rest: REST) {
     }
 
     console.log(`[DEPLOY] Dados dos comandos:`, JSON.stringify(commands.map((c: any) => c.name)))
-    console.log(`[DEPLOY] Client ID: ${config.discordClientId}`)
 
-    console.log(`[DEPLOY] Registrando ${commands.length} comandos (Global)...`)
-    const globalResult = await rest.put(
-      Routes.applicationCommands(config.discordClientId),
-      { body: commands }
-    ) as any
-    console.log(`[DEPLOY] Global: ${globalResult.length} comandos registrados`)
+    console.log(`[DEPLOY] Limpando comandos globais...`)
+    await rest.put(Routes.applicationCommands(config.discordClientId), { body: [] })
 
     const guildIds = Array.from(c.guilds.cache.keys())
     console.log(`[DEPLOY] ${guildIds.length} guild(s) encontradas`)
 
     for (const guildId of guildIds) {
-      console.log(`[DEPLOY] Registrando comandos na guild ${guildId}...`)
-      const guildResult = await rest.put(
+      console.log(`[DEPLOY] Registrando ${commands.length} comandos na guild ${guildId}...`)
+      await rest.put(
         Routes.applicationGuildCommands(config.discordClientId, guildId),
         { body: commands }
-      ) as any
-      console.log(`[DEPLOY] Guild ${guildId}: ${guildResult.length} comandos registrados`)
+      )
     }
 
     console.log('[DEPLOY] Slash commands registrados com sucesso!')
