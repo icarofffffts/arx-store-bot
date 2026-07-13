@@ -6,6 +6,7 @@ import {
   ButtonStyle,
   StringSelectMenuBuilder,
   ChannelType,
+  ChannelSelectMenuBuilder,
   RoleSelectMenuBuilder,
 } from "discord.js"
 import { createCommand, createResponder, colors } from "../base"
@@ -236,27 +237,46 @@ createResponder({
   types: ["Button"],
   async run(interaction: any) {
     const botSlug = interaction.customId.split(":")[1]
-    const channel = interaction.channel
+
+    const select = new ChannelSelectMenuBuilder()
+      .setCustomId(`mgr_channelselect:${botSlug}`)
+      .setPlaceholder("Selecione o canal de vendas...")
+      .setChannelTypes(ChannelType.GuildText)
+
+    await interaction.reply({
+      content: "Selecione o canal onde o anuncio de venda sera postado:",
+      components: [new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(select)],
+      ephemeral: true,
+    })
+  },
+})
+
+createResponder({
+  customId: "mgr_channelselect:**",
+  types: ["ChannelSelect"],
+  async run(interaction: any) {
+    const botSlug = interaction.customId.split(":")[1]
+    const channelId = interaction.values[0]
     const configs = await getSalesConfig(interaction.guildId!)
     const cfg = configs[botSlug]
 
+    const hasRole = !!cfg?.clienteRoleId
     configs[botSlug] = {
-      channelId: channel.id,
+      channelId,
       clienteRoleId: cfg?.clienteRoleId ?? "",
-      active: false,
+      messageId: cfg?.messageId,
+      active: hasRole,
     }
 
     await saveSalesConfig(interaction.guildId!, configs)
-    await interaction.reply({
-      content: `✅ Canal de vendas do **${botSlug}** definido para este canal. Agora configure o cargo de cliente.`,
-      ephemeral: true,
+
+    const updatedCfg = configs[botSlug]
+    const { embed, rows } = buildBotPanel(botSlug, updatedCfg)
+    await interaction.update({
+      content: null,
+      embeds: [embed],
+      components: rows,
     })
-    setTimeout(async () => {
-      const newConfigs = await getSalesConfig(interaction.guildId!)
-      const updatedCfg = newConfigs[botSlug]
-      const { embed, rows } = buildBotPanel(botSlug, updatedCfg)
-      await interaction.editReply({ embeds: [embed], components: rows }).catch(() => {})
-    }, 500)
   },
 })
 
@@ -265,12 +285,6 @@ createResponder({
   types: ["Button"],
   async run(interaction: any) {
     const botSlug = interaction.customId.split(":")[1]
-    const configs = await getSalesConfig(interaction.guildId!)
-    const cfg = configs[botSlug]
-
-    if (!cfg?.channelId) {
-      return interaction.reply({ content: "Defina o canal de vendas primeiro.", ephemeral: true })
-    }
 
     const select = new RoleSelectMenuBuilder()
       .setCustomId(`mgr_roleselect:${botSlug}`)
@@ -293,18 +307,22 @@ createResponder({
     const configs = await getSalesConfig(interaction.guildId!)
     const cfg = configs[botSlug]
 
+    const hasChannel = !!cfg?.channelId
     configs[botSlug] = {
       channelId: cfg?.channelId ?? "",
       clienteRoleId: roleId,
-      active: true,
+      messageId: cfg?.messageId,
+      active: hasChannel,
     }
 
     await saveSalesConfig(interaction.guildId!, configs)
 
-    const roleMention = `<@&${roleId}>`
-    await interaction.reply({
-      content: `✅ Cargo de cliente definido como ${roleMention}. O anuncio esta pronto para ser postado!`,
-      ephemeral: true,
+    const updatedCfg = configs[botSlug]
+    const { embed, rows } = buildBotPanel(botSlug, updatedCfg)
+    await interaction.update({
+      content: null,
+      embeds: [embed],
+      components: rows,
     })
   },
 })
