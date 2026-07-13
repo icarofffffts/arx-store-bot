@@ -45,18 +45,26 @@ interface SalesConfig {
 }
 
 async function getSalesConfig(guildId: string): Promise<Record<string, SalesConfig>> {
-  const { data } = await getBotSupabase()
+  const { data, error } = await getBotSupabase()
     .from("settings")
     .select("value")
     .eq("key", `sales_config_${guildId}`)
     .single()
-  return data?.value ?? {}
+  console.log(`[Manager] getSalesConfig(${guildId}):`, JSON.stringify(data?.value), "error:", error?.message ?? "none")
+  const raw = data?.value
+  if (!raw) return {}
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw) } catch { return {} }
+  }
+  return raw as Record<string, SalesConfig>
 }
 
 async function saveSalesConfig(guildId: string, config: Record<string, SalesConfig>) {
-  await getBotSupabase()
+  console.log(`[Manager] saveSalesConfig(${guildId}):`, JSON.stringify(config))
+  const { error } = await getBotSupabase()
     .from("settings")
     .upsert({ key: `sales_config_${guildId}`, value: config }, { onConflict: "key" })
+  if (error) console.error(`[Manager] saveSalesConfig ERROR:`, error.message)
 }
 
 function buildMainPanel(configs: Record<string, SalesConfig>) {
@@ -257,8 +265,10 @@ createResponder({
   async run(interaction: any) {
     const botSlug = interaction.customId.split(":")[1]
     const channelId = interaction.values[0]
+    console.log(`[Manager] channelselect: botSlug=${botSlug}, channelId=${channelId}`)
     const configs = await getSalesConfig(interaction.guildId!)
     const cfg = configs[botSlug]
+    console.log(`[Manager] channelselect: existing cfg for ${botSlug}:`, JSON.stringify(cfg))
 
     const hasRole = !!cfg?.clienteRoleId
     configs[botSlug] = {
@@ -267,8 +277,13 @@ createResponder({
       messageId: cfg?.messageId,
       active: hasRole,
     }
+    console.log(`[Manager] channelselect: saving full config:`, JSON.stringify(configs))
 
     await saveSalesConfig(interaction.guildId!, configs)
+
+    // Re-read to confirm it saved
+    const verify = await getSalesConfig(interaction.guildId!)
+    console.log(`[Manager] channelselect: verified config after save:`, JSON.stringify(verify))
 
     const updatedCfg = configs[botSlug]
     const { embed, rows } = buildBotPanel(botSlug, updatedCfg)
@@ -304,8 +319,10 @@ createResponder({
   async run(interaction: any) {
     const botSlug = interaction.customId.split(":")[1]
     const roleId = interaction.values[0]
+    console.log(`[Manager] roleselect: botSlug=${botSlug}, roleId=${roleId}`)
     const configs = await getSalesConfig(interaction.guildId!)
     const cfg = configs[botSlug]
+    console.log(`[Manager] roleselect: existing cfg for ${botSlug}:`, JSON.stringify(cfg))
 
     const hasChannel = !!cfg?.channelId
     configs[botSlug] = {
@@ -314,8 +331,13 @@ createResponder({
       messageId: cfg?.messageId,
       active: hasChannel,
     }
+    console.log(`[Manager] roleselect: saving full config:`, JSON.stringify(configs))
 
     await saveSalesConfig(interaction.guildId!, configs)
+
+    // Re-read to confirm it saved
+    const verify = await getSalesConfig(interaction.guildId!)
+    console.log(`[Manager] roleselect: verified config after save:`, JSON.stringify(verify))
 
     const updatedCfg = configs[botSlug]
     const { embed, rows } = buildBotPanel(botSlug, updatedCfg)
