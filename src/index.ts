@@ -51,7 +51,8 @@ createEvent({
     console.log(`[ARX STORE] Bot conectado como ${c.user.tag}`)
     setupCreators(client)
 
-    await deployCommands(c)
+    const rest = new REST({ version: '10' }).setToken(config.discordToken)
+    await deployCommands(c, rest)
 
     await loadGuildModules(client)
 
@@ -65,7 +66,7 @@ createEvent({
   },
 })
 
-async function deployCommands(c: Client<true>) {
+async function deployCommands(c: Client<true>, rest: REST) {
   try {
     const commands = Array.from(_commands.values()).map(cmd => {
       if (!cmd.data) throw new Error(`Comando sem data: ${(cmd as any).name ?? 'unknown'}`)
@@ -78,8 +79,6 @@ async function deployCommands(c: Client<true>) {
     }
 
     console.log(`[DEPLOY] Dados dos comandos:`, JSON.stringify(commands.map((c: any) => c.name)))
-
-    const rest = new REST({ version: '10' }).setToken(config.discordToken)
     console.log(`[DEPLOY] Client ID: ${config.discordClientId}`)
 
     console.log(`[DEPLOY] Registrando ${commands.length} comandos (Global)...`)
@@ -107,10 +106,38 @@ async function deployCommands(c: Client<true>) {
   }
 }
 
-client.login(config.discordToken)
-  .then(() => console.log('[ARX STORE] Login request enviado...'))
-  .catch(err => {
-    console.error('[ARX STORE] ERRO no login:', err.message)
-    console.error('[ARX STORE] Token definido:', typeof config.discordToken, config.discordToken ? `com ${config.discordToken.length} chars` : 'NAO DEFINIDO')
-    console.error('[ARX STORE] Client ID:', config.discordClientId)
-  })
+client.on('debug', (msg: string) => {
+  if (msg.includes('[WS =>') || msg.includes('Heartbeat') || msg.includes('Authenticating')) {
+    console.log('[DJS]', msg)
+  }
+})
+
+client.on('error', (err: Error) => {
+  console.error('[DJS ERROR]', err.message)
+})
+
+client.on('shardError', (err: Error) => {
+  console.error('[DJS SHARD ERROR]', err.message)
+})
+
+;(async () => {
+  const restCheck = new REST({ version: '10' }).setToken(config.discordToken)
+  try {
+    console.log('[ARX STORE] Testando token na API do Discord...')
+    const me = await restCheck.get('/users/@me') as any
+    console.log(`[ARX STORE] Token OK! Logando como ${me.username} (${me.id})...`)
+  } catch (e: any) {
+    console.error(`[ARX STORE] TOKEN INVALIDO! Discord API: ${e.message}`)
+    process.exit(1)
+  }
+
+  try {
+    console.log('[ARX STORE] Conectando ao Gateway...')
+    await client.login(config.discordToken)
+    console.log('[ARX STORE] Gateway conectado!')
+  } catch (e: any) {
+    console.error('[ARX STORE] ERRO ao conectar:', e.message)
+    console.error('[ARX STORE] Detalhes:', e.code ?? e.httpStatus ?? 'sem detalhes')
+    process.exit(1)
+  }
+})()
