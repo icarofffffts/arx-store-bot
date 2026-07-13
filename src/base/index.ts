@@ -103,8 +103,10 @@ export const res: Res = (Object.entries(colors) as [ColorKey, number][])
 
 // ── CustomID pattern matching ─────────────────────────────
 function matchPattern(pattern: string, customId: string): Record<string, string> | null {
-  const patternParts = pattern.split('/').filter(Boolean)
-  const idParts      = customId.split('/').filter(Boolean)
+  const normalizedPattern = pattern.replace(/:/g, '/')
+  const normalizedId      = customId.replace(/:/g, '/')
+  const patternParts = normalizedPattern.split('/').filter(Boolean)
+  const idParts      = normalizedId.split('/').filter(Boolean)
 
   // Wildcard **
   const wildcardIdx = patternParts.indexOf('**')
