@@ -49,7 +49,6 @@ createEvent({
   once: true,
   async run(c) {
     console.log(`[ARX STORE] Bot conectado como ${c.user.tag}`)
-    setupCreators(client)
 
     const rest = new REST({ version: '10' }).setToken(config.discordToken)
     await deployCommands(c, rest)
@@ -119,6 +118,8 @@ client.on('error', (err: Error) => {
 client.on('shardError', (err: Error) => {
   console.error('[DJS SHARD ERROR]', err.message)
 })
+
+setupCreators(client)
 
 ;(async () => {
   const restCheck = new REST({ version: '10' }).setToken(config.discordToken)
