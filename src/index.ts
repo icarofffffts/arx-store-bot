@@ -72,29 +72,36 @@ async function deployCommands(c: Client<true>) {
       return
     }
 
-    const rest = new REST({ version: '10' }).setToken(config.discordToken)
+    console.log(`[DEPLOY] Dados dos comandos:`, JSON.stringify(commands.map((c: any) => c.name)))
 
-    console.log(`[DEPLOY] Registrando ${commands.length} slash command(s) (Global)...`)
-    await rest.put(
+    const rest = new REST({ version: '10' }).setToken(config.discordToken)
+    console.log(`[DEPLOY] Client ID: ${config.discordClientId}`)
+
+    console.log(`[DEPLOY] Registrando ${commands.length} comandos (Global)...`)
+    const globalResult = await rest.put(
       Routes.applicationCommands(config.discordClientId),
       { body: commands }
-    )
+    ) as any
+    console.log(`[DEPLOY] Global: ${globalResult.length} comandos registrados`)
 
     const guildIds = Array.from(c.guilds.cache.keys())
-    if (guildIds.length) {
-      console.log(`[DEPLOY] Limpando guild commands em ${guildIds.length} guild(s)...`)
-      for (const guildId of guildIds) {
-        await rest.put(
-          Routes.applicationGuildCommands(config.discordClientId, guildId),
-          { body: [] }
-        ).catch(e => console.log(`[DEPLOY] WARN: guild ${guildId} — ${e.message}`))
-      }
+    console.log(`[DEPLOY] ${guildIds.length} guild(s) encontradas`)
+
+    for (const guildId of guildIds) {
+      console.log(`[DEPLOY] Registrando comandos na guild ${guildId}...`)
+      const guildResult = await rest.put(
+        Routes.applicationGuildCommands(config.discordClientId, guildId),
+        { body: commands }
+      ) as any
+      console.log(`[DEPLOY] Guild ${guildId}: ${guildResult.length} comandos registrados`)
     }
 
     console.log('[DEPLOY] Slash commands registrados com sucesso!')
-  } catch (err) {
-    console.error('[DEPLOY] Erro ao registrar commands:', err)
+  } catch (err: any) {
+    console.error('[DEPLOY] ERRO CRITICO:', err.message, err)
   }
 }
 
 client.login(config.discordToken)
+  .then(() => console.log('[ARX STORE] Login request enviado...'))
+  .catch(err => console.error('[ARX STORE] ERRO no login:', err.message))
