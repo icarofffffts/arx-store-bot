@@ -143,7 +143,7 @@ createResponder({
     const botMeta = bots.find((b: any) => b.slug === botSlug)
 
     const sourceOptions = [
-      { label: "botmembros", description: "Bot de revenda de membros c/ PIX", value: "botmembros", emoji: "👥" },
+      { label: "botmembros", description: "Bot geral - vendas, auth, tickets e membros", value: "botmembros", emoji: "🤖" },
       { label: "promisse-tickets", description: "Sistema completo de tickets c/ pagamento", value: "promisse-tickets", emoji: "🎫" },
       { label: "vendas-ghost-studio", description: "Loja completa no Discord c/ tickets e nitro", value: "vendas-ghost-studio", emoji: "🛒" },
     ]
@@ -190,7 +190,7 @@ createResponder({
     const botMeta = bots.find((b: any) => b.slug === botSlug)
 
     const sourceNames: Record<string, string> = {
-      "botmembros": "👥 Bot de Membros",
+      "botmembros": "🤖 Bot Geral (Vendas/Auth/Tickets)",
       "promisse-tickets": "🎫 Sistema de Tickets",
       "vendas-ghost-studio": "🛒 Loja Completa",
     }
