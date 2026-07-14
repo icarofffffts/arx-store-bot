@@ -11,6 +11,7 @@ import {
 } from "discord.js"
 import { createCommand, createResponder, colors } from "../base"
 import { getBotSupabase } from "../utils/supabase"
+import { config } from "../config"
 
 const WHITELABEL_FEE = 15.0
 
@@ -124,6 +125,10 @@ function buildMainPanel(configs: Record<string, SalesConfig>) {
 
   rows.push(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId("mgr_approve_payments")
+        .setLabel("💰 Aprovar Pagamentos")
+        .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
         .setCustomId("mgr_refresh")
         .setLabel("📋 Recarregar")
@@ -479,5 +484,155 @@ createResponder({
         `acesse o site. Envie sua ideia neste canal ${channel} que nossa equipe entrara em contato.`,
       ephemeral: true,
     })
+  },
+})
+
+createResponder({
+  customId: "mgr_approve_payments",
+  types: ["Button"],
+  async run(interaction: any) {
+    if (!config.adminUserIds.includes(interaction.user.id)) {
+      return interaction.reply({
+        content: "Apenas administradores podem aprovar pagamentos.",
+        ephemeral: true,
+      })
+    }
+
+    const guildId = interaction.guildId!
+    const { data: orders } = await getBotSupabase()
+      .from("custom_bot_orders")
+      .select("id, user_id, bot_slug, status, metadata, mp_payment_id, created_at")
+      .or("status.eq.awaiting_payment,status.eq.pending")
+      .order("created_at", { ascending: false })
+      .limit(25)
+
+    if (!orders || orders.length === 0) {
+      return interaction.reply({
+        content: "Nenhum pagamento pendente encontrado.",
+        ephemeral: true,
+      })
+    }
+
+    const select = new StringSelectMenuBuilder()
+      .setCustomId("mgr_approve_select")
+      .setPlaceholder("Selecione um pedido para aprovar...")
+      .addOptions(
+        orders.slice(0, 25).map((o: any) => {
+          const meta = typeof o.metadata === "string" ? JSON.parse(o.metadata) : o.metadata
+          const label = `#${(o.id as string).slice(0, 6)} — ${meta?.bot_name ?? o.bot_slug}`
+          const desc = `R$ ${(meta?.total_price ?? 0).toFixed(2).replace(".", ",")} — ${o.status}`
+          return {
+            label: label.slice(0, 100),
+            description: desc.slice(0, 100),
+            value: o.id,
+          }
+        })
+      )
+
+    await interaction.reply({
+      content: "Selecione o pedido que deseja aprovar manualmente:",
+      components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select)],
+      ephemeral: true,
+    })
+  },
+})
+
+createResponder({
+  customId: "mgr_approve_select",
+  types: ["StringSelect"],
+  async run(interaction: any) {
+    if (!config.adminUserIds.includes(interaction.user.id)) {
+      return interaction.reply({
+        content: "Apenas administradores podem aprovar pagamentos.",
+        ephemeral: true,
+      })
+    }
+
+    const orderId = interaction.values[0]
+
+    const { data: order } = await getBotSupabase()
+      .from("custom_bot_orders")
+      .select("id, user_id, bot_slug, metadata, mp_payment_id")
+      .eq("id", orderId)
+      .single()
+
+    if (!order) {
+      return interaction.reply({ content: "Pedido nao encontrado.", ephemeral: true })
+    }
+
+    await interaction.deferReply({ ephemeral: true })
+
+    try {
+      const meta = typeof order.metadata === "string" ? JSON.parse(order.metadata) : (order.metadata ?? {})
+
+      await getBotSupabase()
+        .from("custom_bot_orders")
+        .update({ status: "paid", mp_payment_id: order.mp_payment_id ?? "manual" })
+        .eq("id", orderId)
+
+      const guildId = meta.guild_id
+      const clienteRoleId = meta.cliente_role_id
+      const salesChannelId = meta.sales_channel_id
+
+      const { data: user } = await getBotSupabase()
+        .from("users")
+        .select("discord_id, name")
+        .eq("id", order.user_id)
+        .single()
+
+      const userId = user?.discord_id
+
+      if (clienteRoleId && guildId && userId) {
+        try {
+          const guild = await interaction.client.guilds.fetch(guildId)
+          const member = await guild.members.fetch(userId)
+          await member.roles.add(clienteRoleId)
+          console.log(`[Manager] Role ${clienteRoleId} adicionado a ${userId}`)
+        } catch (e: any) {
+          console.error(`[Manager] Erro ao adicionar role: ${e.message}`)
+        }
+      }
+
+      if (salesChannelId && userId) {
+        try {
+          const channel = await interaction.client.channels.fetch(salesChannelId)
+          if (channel && "send" in channel) {
+            const embed = new EmbedBuilder()
+              .setTitle("✅ Pagamento Aprovado!")
+              .setColor(0x22c55e)
+              .setDescription(
+                `<@${userId}>, seu pagamento foi **aprovado manualmente** e o cargo de cliente foi liberado!\n\n` +
+                "Clique no botao abaixo para **ativar seu bot**."
+              )
+
+            const activateBtn = new ButtonBuilder()
+              .setCustomId(`activate_bot:${orderId}`)
+              .setLabel("🚀 Ativar Bot")
+              .setStyle(ButtonStyle.Success)
+
+            await (channel as any).send({
+              content: `<@${userId}>`,
+              embeds: [embed],
+              components: [new ActionRowBuilder<ButtonBuilder>().addComponents(activateBtn)],
+            })
+          }
+        } catch (e: any) {
+          console.error(`[Manager] Erro ao enviar msg de aprovacao: ${e.message}`)
+        }
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Pagamento Aprovado")
+        .setDescription(
+          `Pedido **#${(orderId as string).slice(0, 8)}** aprovado com sucesso!\n\n` +
+          `Comprador: ${user?.name ?? "N/A"} (<@${userId ?? "N/A"}>)\n` +
+          `Bot: ${meta.bot_name ?? order.bot_slug}`
+        )
+        .setColor(0x22c55e)
+
+      await interaction.editReply({ embeds: [embed] })
+    } catch (err: any) {
+      await interaction.editReply({ content: `Erro ao aprovar pagamento: ${err.message}` })
+    }
   },
 })

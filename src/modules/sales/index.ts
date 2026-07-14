@@ -207,6 +207,7 @@ createResponder({
       total_price: totalPrice,
       cliente_role_id: clienteRoleId,
       guild_id: interaction.guildId,
+      sales_channel_id: interaction.channelId,
     })
 
     if (!order) {
