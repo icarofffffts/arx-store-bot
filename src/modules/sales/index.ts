@@ -142,33 +142,86 @@ createResponder({
     const bots = await getDefaultBots()
     const botMeta = bots.find((b: any) => b.slug === botSlug)
 
+    const sourceOptions = [
+      { label: "botmembros", description: "Bot de revenda de membros c/ PIX", value: "botmembros", emoji: "👥" },
+      { label: "promisse-tickets", description: "Sistema completo de tickets c/ pagamento", value: "promisse-tickets", emoji: "🎫" },
+      { label: "vendas-ghost-studio", description: "Loja completa no Discord c/ tickets e nitro", value: "vendas-ghost-studio", emoji: "🛒" },
+    ]
+
+    const payload = `${botSlug}:${duration}:${basePrice}:${encodeURIComponent(label)}:${clienteRoleId}`
+
+    const sourceSelect = new StringSelectMenuBuilder()
+      .setCustomId(`sales_source:${payload}`)
+      .setPlaceholder("Escolha a source do bot...")
+      .addOptions(sourceOptions)
+
+    const embed = new EmbedBuilder()
+      .setTitle("📦 Escolha a Source")
+      .setColor(0xe11d48)
+      .setDescription(
+        `**Bot:** ${botMeta?.name ?? botSlug}\n` +
+        `**Duracao:** ${label}\n` +
+        `**Preco base:** R$ ${basePrice.toFixed(2).replace(".", ",")}\n\n` +
+        "Escolha qual source (codigo) voce quer para seu bot:"
+      )
+
+    await interaction.reply({
+      embeds: [embed],
+      components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(sourceSelect)],
+      ephemeral: true,
+    })
+  },
+})
+
+createResponder({
+  scope: 'master',
+  customId: "sales_source:**",
+  types: ["StringSelect"],
+  async run(interaction: any) {
+    const customParts = interaction.customId.split(":")
+    const botSlug = customParts[1]
+    const duration = customParts[2]
+    const basePrice = parseFloat(customParts[3])
+    const label = decodeURIComponent(customParts[4])
+    const clienteRoleId = customParts[5]
+    const sourceSlug = interaction.values[0]
+
+    const bots = await getDefaultBots()
+    const botMeta = bots.find((b: any) => b.slug === botSlug)
+
+    const sourceNames: Record<string, string> = {
+      "botmembros": "👥 Bot de Membros",
+      "promisse-tickets": "🎫 Sistema de Tickets",
+      "vendas-ghost-studio": "🛒 Loja Completa",
+    }
+
     const embed = new EmbedBuilder()
       .setTitle("🏷️ Deseja Whitelabel?")
       .setColor(0xe11d48)
       .setDescription(
         `**Bot:** ${botMeta?.name ?? botSlug}\n` +
+        `**Source:** ${sourceNames[sourceSlug] ?? sourceSlug}\n` +
         `**Duracao:** ${label}\n` +
         `**Preco base:** R$ ${basePrice.toFixed(2).replace(".", ",")}\n` +
         `**Whitelabel:** +R$ ${WHITELABEL_FEE.toFixed(2).replace(".", ",")}\n\n` +
         "Whitelabel remove todas as marcas ARX do bot. Seu cliente nao ve \"ARX\" em lugar nenhum — parece um bot exclusivo."
       )
 
-    const payload = `${botSlug}:${duration}:${basePrice}:${encodeURIComponent(label)}:${clienteRoleId}`
+    const wlPayload = `${botSlug}:${duration}:${basePrice}:${encodeURIComponent(label)}:${clienteRoleId}:${sourceSlug}`
 
     const simBtn = new ButtonBuilder()
-      .setCustomId(`sales_wl:yes:${payload}`)
+      .setCustomId(`sales_wl:yes:${wlPayload}`)
       .setLabel(`Sim (+R$ ${WHITELABEL_FEE.toFixed(2).replace(".", ",")})`)
       .setStyle(ButtonStyle.Success)
 
     const naoBtn = new ButtonBuilder()
-      .setCustomId(`sales_wl:no:${payload}`)
+      .setCustomId(`sales_wl:no:${wlPayload}`)
       .setLabel("Nao (padrao ARX)")
       .setStyle(ButtonStyle.Secondary)
 
-    await interaction.reply({
+    await interaction.update({
       embeds: [embed],
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(simBtn, naoBtn)],
-      ephemeral: true,
     })
   },
 })
@@ -185,6 +238,7 @@ createResponder({
     const basePrice = parseFloat(parts[4])
     const label = decodeURIComponent(parts[5])
     const clienteRoleId = parts[6]
+    const sourceSlug = parts[7] || "botmembros"
     const whitelabel = choice === "yes"
     const totalPrice = whitelabel ? basePrice + WHITELABEL_FEE : basePrice
 
@@ -204,6 +258,7 @@ createResponder({
 
     const order = await createOrder(interaction.user.id, botSlug, {
       bot_name: botMeta?.name ?? botSlug,
+      source_slug: sourceSlug,
       duration,
       duration_label: label,
       base_price: basePrice,
