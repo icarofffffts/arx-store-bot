@@ -16,6 +16,8 @@ import { createPixPayment, getPaymentStatus } from "../../utils/mercadopago"
 
 const WHITELABEL_FEE = 15.0
 
+const TICKET_ADDON = 20.0
+
 const PRICING_OPTIONS = [
   { id: "1m", label: "1 Mes", price: 19.90 },
   { id: "3m", label: "3 Meses", price: 49.90 },
@@ -143,7 +145,6 @@ createResponder({
     const botMeta = bots.find((b: any) => b.slug === botSlug)
 
     const sourceOptions = [
-      { label: "botmembros", description: "Sistema de membros com PIX e painel de vendas", value: "botmembros", emoji: "👥" },
       { label: "promisse-tickets", description: "Sistema completo de tickets com pagamento", value: "promisse-tickets", emoji: "🎫" },
       { label: "vendas-ghost-studio", description: "Loja completa no Discord com produtos e entregas", value: "vendas-ghost-studio", emoji: "🛒" },
     ]
@@ -190,7 +191,6 @@ createResponder({
     const botMeta = bots.find((b: any) => b.slug === botSlug)
 
     const sourceNames: Record<string, string> = {
-      "botmembros": "👥 Sistema de Membros",
       "promisse-tickets": "🎫 Sistema de Tickets",
       "vendas-ghost-studio": "🛒 Loja Completa",
     }
@@ -238,9 +238,42 @@ createResponder({
     const basePrice = parseFloat(parts[4])
     const label = decodeURIComponent(parts[5])
     const clienteRoleId = parts[6]
-    const sourceSlug = parts[7] || "botmembros"
+    const sourceSlug = parts[7] || "promisse-tickets"
     const whitelabel = choice === "yes"
     const totalPrice = whitelabel ? basePrice + WHITELABEL_FEE : basePrice
+
+    const bots = await getDefaultBots()
+    const botMeta = bots.find((b: any) => b.slug === botSlug)
+
+    if (sourceSlug === "vendas-ghost-studio") {
+      const ticketPayload = `${botSlug}:${duration}:${basePrice}:${encodeURIComponent(label)}:${clienteRoleId}:${sourceSlug}:${choice}:${totalPrice}`
+
+      const embed = new EmbedBuilder()
+        .setTitle("🎫 Deseja incluir o sistema de Ticket?")
+        .setColor(0xe11d48)
+        .setDescription(
+          `**Bot:** ${botMeta?.name ?? botSlug}\n` +
+          `**Duracao:** ${label}\n` +
+          `**Preco atual:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n` +
+          `**Ticket:** +R$ ${TICKET_ADDON.toFixed(2).replace(".", ",")}\n\n` +
+          "Adicione o sistema completo de tickets ao seu bot de vendas!"
+        )
+
+      const simBtn = new ButtonBuilder()
+        .setCustomId(`sales_ticket:yes:${ticketPayload}`)
+        .setLabel(`Sim (+R$ ${TICKET_ADDON.toFixed(2).replace(".", ",")})`)
+        .setStyle(ButtonStyle.Success)
+
+      const naoBtn = new ButtonBuilder()
+        .setCustomId(`sales_ticket:no:${ticketPayload}`)
+        .setLabel("Nao")
+        .setStyle(ButtonStyle.Secondary)
+
+      return interaction.update({
+        embeds: [embed],
+        components: [new ActionRowBuilder<ButtonBuilder>().addComponents(simBtn, naoBtn)],
+      })
+    }
 
     await interaction.deferReply({ ephemeral: true })
 
@@ -252,9 +285,6 @@ createResponder({
     }
 
     const emailToUse = user.email || "cliente@arx.store"
-
-    const bots = await getDefaultBots()
-    const botMeta = bots.find((b: any) => b.slug === botSlug)
 
     const order = await createOrder(interaction.user.id, botSlug, {
       bot_name: botMeta?.name ?? botSlug,
@@ -294,6 +324,105 @@ createResponder({
       .setDescription(
         `**${botMeta?.name ?? botSlug}**\n` +
         `${label}${whitelabel ? " (Whitelabel)" : ""}\n\n` +
+        `**Valor:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n\n` +
+        "Escaneie o QR Code com o app do seu banco.\n" +
+        "O QR Code expira em 30 minutos.\n\n" +
+        `**Pedido:** #${(order.id as string).slice(0, 8)}`
+      )
+      .setFooter({ text: "Aguardando pagamento..." })
+
+    const files: AttachmentBuilder[] = []
+    if (pixResult.qrCodeBase64) {
+      files.push(new AttachmentBuilder(Buffer.from(pixResult.qrCodeBase64, "base64"), { name: "pix.png" }))
+    }
+
+    await interaction.editReply({
+      embeds: [qrEmbed],
+      files,
+    })
+
+    pollPayment({
+      paymentId: pixResult.id,
+      orderId: order.id,
+      client: interaction.client as Client,
+      guildId: interaction.guildId!,
+      userId: interaction.user.id,
+      clienteRoleId,
+      channelId: interaction.channelId,
+    }).catch(() => {})
+  },
+})
+
+createResponder({
+  scope: 'master',
+  customId: "sales_ticket:**",
+  types: ["Button"],
+  async run(interaction: any) {
+    const parts = interaction.customId.split(":")
+    const ticketChoice = parts[1]
+    const botSlug = parts[2]
+    const duration = parts[3]
+    const basePrice = parseFloat(parts[4])
+    const label = decodeURIComponent(parts[5])
+    const clienteRoleId = parts[6]
+    const sourceSlug = parts[7]
+    const whitelabel = parts[8] === "yes"
+    const ticketEnabled = ticketChoice === "yes"
+    const totalPrice = (parseFloat(parts[9]) || 0) + (ticketEnabled ? TICKET_ADDON : 0)
+
+    await interaction.deferReply({ ephemeral: true })
+
+    const user = await getUserByDiscordId(interaction.user.id)
+    if (!user) {
+      return interaction.editReply({
+        content: "Voce precisa de uma conta na ARX Store para comprar. Acesse o site primeiro.",
+      })
+    }
+
+    const emailToUse = user.email || "cliente@arx.store"
+
+    const bots = await getDefaultBots()
+    const botMeta = bots.find((b: any) => b.slug === botSlug)
+
+    const order = await createOrder(interaction.user.id, botSlug, {
+      bot_name: botMeta?.name ?? botSlug,
+      source_slug: sourceSlug,
+      duration,
+      duration_label: label,
+      base_price: basePrice,
+      whitelabel,
+      ticket_enabled: ticketEnabled,
+      total_price: totalPrice,
+      cliente_role_id: clienteRoleId,
+      guild_id: interaction.guildId,
+      sales_channel_id: interaction.channelId,
+    })
+
+    if (!order) {
+      return interaction.editReply({ content: "Erro ao criar pedido." })
+    }
+
+    let pixResult
+    try {
+      pixResult = await createPixPayment({
+        amount: totalPrice,
+        description: `${botMeta?.name ?? botSlug} — ${label}${whitelabel ? " (Whitelabel)" : ""}${ticketEnabled ? " +Ticket" : ""}`,
+        email: emailToUse,
+        firstName: interaction.user.username,
+        orderId: order.id,
+      })
+    } catch (err: any) {
+      return interaction.editReply({ content: `Erro ao gerar Pix: ${err.message}` })
+    }
+
+    await updateOrder(order.id, { mp_payment_id: String(pixResult.id), status: "awaiting_payment" })
+
+    const qrEmbed = new EmbedBuilder()
+      .setTitle("📱 Pague com Pix")
+      .setColor(0xe11d48)
+      .setDescription(
+        `**${botMeta?.name ?? botSlug}**\n` +
+        `${label}${whitelabel ? " (Whitelabel)" : ""}${ticketEnabled ? " +Ticket" : ""}\n\n` +
         `**Valor:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n\n` +
         "Escaneie o QR Code com o app do seu banco.\n" +
         "O QR Code expira em 30 minutos.\n\n" +
