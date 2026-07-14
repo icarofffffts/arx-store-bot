@@ -7,8 +7,7 @@ export function createBotSupabase() {
   if (_botSupabase) return _botSupabase
   _botSupabase = createClient(config.supabaseUrl, config.supabaseKey, {
     auth: { persistSession: false },
-    db: { schema: 'store' },
-  }) as any
+  }).schema('store') as any
   return _botSupabase
 }
 
