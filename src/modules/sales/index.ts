@@ -189,11 +189,13 @@ createResponder({
     await interaction.deferReply({ ephemeral: true })
 
     const user = await getUserByDiscordId(interaction.user.id)
-    if (!user?.email) {
+    if (!user) {
       return interaction.editReply({
-        content: "Sua conta nao tem email vinculado. Vincule no site primeiro.",
+        content: "Voce precisa de uma conta na ARX Store para comprar. Acesse o site primeiro.",
       })
     }
+
+    const emailToUse = user.email || "cliente@arx.store"
 
     const bots = await getDefaultBots()
     const botMeta = bots.find((b: any) => b.slug === botSlug)
@@ -219,7 +221,7 @@ createResponder({
       pixResult = await createPixPayment({
         amount: totalPrice,
         description: `${botMeta?.name ?? botSlug} — ${label}${whitelabel ? " (Whitelabel)" : ""}`,
-        email: user.email,
+        email: emailToUse,
         firstName: interaction.user.username,
         orderId: order.id,
       })
