@@ -11,6 +11,7 @@ const STATUS_MAP: Record<string, { label: string; color: number }> = {
 }
 
 createCommand({
+  scope: 'master',
   data: new SlashCommandBuilder()
     .setName('meuplano')
     .setDescription('Ve seu plano atual e status da assinatura'),

@@ -4,6 +4,7 @@ import { getBotConfig, updateBotConfig, getGuildBots } from '../utils/store-quer
 import { getBotSupabase } from '../utils/supabase'
 
 createCommand({
+  scope: 'master',
   data: new SlashCommandBuilder()
     .setName('config')
     .setDescription('Configura um bot ativo no servidor')

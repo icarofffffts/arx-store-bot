@@ -6,6 +6,7 @@ import { loadGuildModules } from '../modules/manager'
 import { config } from '../config'
 
 createCommand({
+  scope: 'master',
   data: new SlashCommandBuilder()
     .setName('admin')
     .setDescription('Comandos administrativos da ARX Store')

@@ -5,6 +5,7 @@ import { getBotSupabase } from '../utils/supabase'
 import { loadGuildModules } from '../modules/manager'
 
 createCommand({
+  scope: 'master',
   data: new SlashCommandBuilder()
     .setName('ativar')
     .setDescription('Ativa um bot no servidor')

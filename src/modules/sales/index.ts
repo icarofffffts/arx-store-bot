@@ -127,6 +127,7 @@ async function pollPayment(p: {
 }
 
 createResponder({
+  scope: 'master',
   customId: "sales_buy:**",
   types: ["StringSelect"],
   async run(interaction: any) {
@@ -173,6 +174,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "sales_wl:**",
   types: ["Button"],
   async run(interaction: any) {
@@ -267,6 +269,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "activate_bot:**",
   types: ["Button"],
   async run(interaction: any) {
@@ -308,6 +311,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "activate_modal:**",
   types: ["Modal"],
   async run(interaction: any) {

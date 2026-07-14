@@ -13,6 +13,7 @@ import { createCommand, createResponder, colors } from "../base"
 import { getBotSupabase } from "../utils/supabase"
 import { config } from "../config"
 
+
 const WHITELABEL_FEE = 15.0
 
 const PRICING_OPTIONS = [
@@ -200,6 +201,7 @@ function buildBotPanel(botSlug: string, cfg: SalesConfig | undefined) {
 }
 
 createCommand({
+  scope: 'master',
   data: new SlashCommandBuilder()
     .setName("manager")
     .setDescription("Painel de gerenciamento da ARX Store"),
@@ -214,6 +216,7 @@ createCommand({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_refresh",
   types: ["Button"],
   async run(interaction: any) {
@@ -224,6 +227,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_bot:**",
   types: ["Button"],
   async run(interaction: any) {
@@ -236,6 +240,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_back",
   types: ["Button"],
   async run(interaction: any) {
@@ -246,6 +251,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_channel:**",
   types: ["Button"],
   async run(interaction: any) {
@@ -265,6 +271,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_channelselect:**",
   types: ["ChannelSelect"],
   async run(interaction: any) {
@@ -301,6 +308,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_role:**",
   types: ["Button"],
   async run(interaction: any) {
@@ -319,6 +327,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_roleselect:**",
   types: ["RoleSelect"],
   async run(interaction: any) {
@@ -355,6 +364,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_post:**",
   types: ["Button"],
   async run(interaction: any) {
@@ -445,6 +455,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_custom",
   types: ["Button"],
   async run(interaction: any) {
@@ -474,6 +485,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_custom_order",
   types: ["Button"],
   async run(interaction: any) {
@@ -488,6 +500,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_approve_payments",
   types: ["Button"],
   async run(interaction: any) {
@@ -538,6 +551,7 @@ createResponder({
 })
 
 createResponder({
+  scope: 'master',
   customId: "mgr_approve_select",
   types: ["StringSelect"],
   async run(interaction: any) {

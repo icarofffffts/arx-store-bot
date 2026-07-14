@@ -1,26 +1,23 @@
 /**
- * ARX Store Bot — Entry point
- * Arquitetura Constatic: createCommand / createResponder / createEvent
+ * ARX Store Bot — Entry point (Multi-Client)
+ *
+ * Master client: bot da loja (comandos de vendas, manager, admin)
+ * Slave clients: bots dos clientes (tickets, invites, moderacao)
+ *
+ * Arquitetura Constatic com scope master/slave/all
  */
 
 import './setup'
 
-console.log('[ARX STORE] ===== INICIANDO =====')
+console.log('[ARX STORE] ===== INICIANDO (MULTI-CLIENT) =====')
 console.log('[ARX STORE] Envs disponiveis:', Object.keys(process.env).filter(k =>
   k.startsWith('DISCORD') || k.startsWith('SUPABASE') || k.startsWith('NEXT') || k.startsWith('MERCADO')
 ).join(', '))
 
-import {
-  Client,
-  GatewayIntentBits,
-  Events,
-  REST,
-  Routes,
-} from 'discord.js'
-
 import { config } from './config'
-import { setupCreators, createEvent, _commands } from './base'
+import { createEvent, _commands } from './base'
 import { loadGuildModules, refreshGuildModules } from './modules/manager'
+import { clientManager } from './utils/client-manager'
 
 import './commands/loja'
 import './commands/meuplano'
@@ -28,36 +25,24 @@ import './commands/ativar'
 import './commands/desativar'
 import './commands/config'
 import './commands/manager'
+import './commands/admin'
 
 import './modules/tickets'
 import './modules/invites'
 import './modules/moderation'
 import './modules/sales'
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildInvites,
-  ],
-})
-
 createEvent({
-  name: Events.ClientReady,
+  name: 'ready',
   once: true,
-  async run(c) {
+  async run(c: any) {
     console.log(`[ARX STORE] Bot conectado como ${c.user.tag}`)
 
-    const rest = new REST({ version: '10' }).setToken(config.discordToken)
-    await deployCommands(c, rest)
-
-    await loadGuildModules(client)
+    await loadGuildModules(c)
 
     setInterval(async () => {
       try {
-        await refreshGuildModules(client)
+        await refreshGuildModules(c)
       } catch (err) {
         console.error('[ARX STORE] Erro ao atualizar modulos:', err)
       }
@@ -65,58 +50,10 @@ createEvent({
   },
 })
 
-async function deployCommands(c: Client<true>, rest: REST) {
-  try {
-    const commands = Array.from(_commands.values()).map(cmd => {
-      if (!cmd.data) throw new Error(`Comando sem data: ${(cmd as any).name ?? 'unknown'}`)
-      return cmd.data.toJSON()
-    })
-
-    if (commands.length === 0) {
-      console.log('[DEPLOY] Nenhum comando para registrar.')
-      return
-    }
-
-    console.log(`[DEPLOY] Dados dos comandos:`, JSON.stringify(commands.map((c: any) => c.name)))
-
-    console.log(`[DEPLOY] Limpando comandos globais...`)
-    await rest.put(Routes.applicationCommands(config.discordClientId), { body: [] })
-
-    const guildIds = Array.from(c.guilds.cache.keys())
-    console.log(`[DEPLOY] ${guildIds.length} guild(s) encontradas`)
-
-    for (const guildId of guildIds) {
-      console.log(`[DEPLOY] Registrando ${commands.length} comandos na guild ${guildId}...`)
-      await rest.put(
-        Routes.applicationGuildCommands(config.discordClientId, guildId),
-        { body: commands }
-      )
-    }
-
-    console.log('[DEPLOY] Slash commands registrados com sucesso!')
-  } catch (err: any) {
-    console.error('[DEPLOY] ERRO CRITICO:', err.message, err)
-  }
-}
-
-client.on('debug', (msg: string) => {
-  if (msg.includes('[WS =>') || msg.includes('Heartbeat') || msg.includes('Authenticating')) {
-    console.log('[DJS]', msg)
-  }
-})
-
-client.on('error', (err: Error) => {
-  console.error('[DJS ERROR]', err.message)
-})
-
-client.on('shardError', (err: Error) => {
-  console.error('[DJS SHARD ERROR]', err.message)
-})
-
-setupCreators(client)
-
 ;(async () => {
+  const { REST } = await import('discord.js')
   const restCheck = new REST({ version: '10' }).setToken(config.discordToken)
+
   try {
     console.log('[ARX STORE] Testando token na API do Discord...')
     const me = await restCheck.get('/users/@me') as any
@@ -127,12 +64,13 @@ setupCreators(client)
   }
 
   try {
-    console.log('[ARX STORE] Conectando ao Gateway...')
-    await client.login(config.discordToken)
-    console.log('[ARX STORE] Gateway conectado!')
+    await clientManager.startMaster(config.discordToken)
+    console.log(`[ARX STORE] Master online. Comandos: ${_commands.size}`)
+
+    clientManager.startSyncLoop(60_000)
+    console.log(`[ARX STORE] Sync de bots clientes iniciado (a cada 60s).`)
   } catch (e: any) {
     console.error('[ARX STORE] ERRO ao conectar:', e.message)
-    console.error('[ARX STORE] Detalhes:', e.code ?? e.httpStatus ?? 'sem detalhes')
     process.exit(1)
   }
 })()

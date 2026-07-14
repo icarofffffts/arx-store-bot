@@ -5,6 +5,7 @@ import { getBotSupabase } from '../utils/supabase'
 import { disableModule } from '../modules/manager'
 
 createCommand({
+  scope: 'master',
   data: new SlashCommandBuilder()
     .setName('desativar')
     .setDescription('Desativa um bot do servidor')

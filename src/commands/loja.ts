@@ -13,6 +13,7 @@ interface BotDefinition {
 }
 
 createCommand({
+  scope: 'master',
   data: new SlashCommandBuilder()
     .setName('loja')
     .setDescription('Ve os bots disponiveis na ARX Store'),

@@ -24,12 +24,14 @@ interface CommandOptions {
   name?: string
   data?: { name: string; toJSON: () => unknown }
   description?: string
+  scope?: 'master' | 'slave' | 'all'
   run: (interaction: any) => Promise<void>
 }
 
 interface ResponderOptions<P = Record<string, string>> {
   customId: string
   types: ResponderType[]
+  scope?: 'master' | 'slave' | 'all'
   cache?: 'cached' | 'raw'
   parse?: (params: Record<string, string>) => P
   run: (interaction: any, params: P) => Promise<void>
@@ -172,13 +174,14 @@ export function setupCreators(config: CreatorsConfig): {
   createEvent: typeof createEvent
   createResponder: typeof createResponder
 }
-export function setupCreators(client: Client): void
-export function setupCreators(arg: Client | CreatorsConfig): any {
+export function setupCreators(client: Client, opts?: { type: 'master' | 'slave' }): void
+export function setupCreators(arg: Client | CreatorsConfig, opts?: { type: 'master' | 'slave' }): any {
   if (!(arg instanceof Client)) {
     _creatorsConfig = arg
     return { createCommand, createEvent, createResponder }
   }
   const client = arg
+  const clientType = opts?.type ?? 'master'
   // Registra eventos customizados
   for (const event of _events) {
     if (event.once) {
@@ -195,6 +198,7 @@ export function setupCreators(arg: Client | CreatorsConfig): any {
       if (interaction.isChatInputCommand()) {
         const cmd = _commands.get(interaction.commandName)
         if (cmd) {
+          if (clientType === 'slave' && cmd.scope === 'master') return
           await cmd.run(interaction)
           return
         }
@@ -205,6 +209,7 @@ export function setupCreators(arg: Client | CreatorsConfig): any {
       if (interaction.isAutocomplete()) {
         const cmd = _commands.get(interaction.commandName)
         if (cmd) {
+          if (clientType === 'slave' && cmd.scope === 'master') return
           await cmd.run(interaction)
           return
         }
@@ -220,6 +225,7 @@ export function setupCreators(arg: Client | CreatorsConfig): any {
 
       for (const responder of _responders) {
         if (!responder.types.includes(interactionType)) continue
+        if (clientType === 'slave' && responder.scope === 'master') continue
 
         const rawParams = matchPattern(responder.customId, customId)
         if (rawParams === null) continue
