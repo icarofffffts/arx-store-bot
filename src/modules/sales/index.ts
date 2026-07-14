@@ -143,9 +143,9 @@ createResponder({
     const botMeta = bots.find((b: any) => b.slug === botSlug)
 
     const sourceOptions = [
-      { label: "botmembros", description: "Bot geral - vendas, auth, tickets e membros", value: "botmembros", emoji: "🤖" },
-      { label: "promisse-tickets", description: "Sistema completo de tickets c/ pagamento", value: "promisse-tickets", emoji: "🎫" },
-      { label: "vendas-ghost-studio", description: "Loja completa no Discord c/ tickets e nitro", value: "vendas-ghost-studio", emoji: "🛒" },
+      { label: "botmembros", description: "Sistema de membros com PIX e painel de vendas", value: "botmembros", emoji: "👥" },
+      { label: "promisse-tickets", description: "Sistema completo de tickets com pagamento", value: "promisse-tickets", emoji: "🎫" },
+      { label: "vendas-ghost-studio", description: "Loja completa no Discord com produtos e entregas", value: "vendas-ghost-studio", emoji: "🛒" },
     ]
 
     const payload = `${botSlug}:${duration}:${basePrice}:${encodeURIComponent(label)}:${clienteRoleId}`
@@ -190,7 +190,7 @@ createResponder({
     const botMeta = bots.find((b: any) => b.slug === botSlug)
 
     const sourceNames: Record<string, string> = {
-      "botmembros": "🤖 Bot Geral (Vendas/Auth/Tickets)",
+      "botmembros": "👥 Sistema de Membros",
       "promisse-tickets": "🎫 Sistema de Tickets",
       "vendas-ghost-studio": "🛒 Loja Completa",
     }
