@@ -33,6 +33,47 @@ const BOT_LABELS: Record<string, string> = {
   "vendas-ghost-studio": "Vendas Ghost Studio",
 }
 
+interface BotMeta {
+  name: string
+  description: string
+  features: string[]
+  pricing: typeof PRICING_OPTIONS
+  ticketAddon?: boolean
+}
+
+const BOT_META: Record<string, BotMeta> = {
+  "promisse-tickets": {
+    name: "Promisse Tickets",
+    description: "Sistema completo de tickets para suporte ao seu servidor Discord. Configure categorias, permissões de cargo, painéis personalizados e muito mais.",
+    features: [
+      "Painel de tickets totalmente personalizável",
+      "Múltiplas categorias de ticket",
+      "Sistema de avaliação de atendimento",
+      "Ranking de atendentes",
+      "Pagamentos via Pix dentro do ticket",
+      "Modal de abertura com perguntas customizáveis",
+      "Logs e histórico de tickets",
+    ],
+    pricing: PRICING_OPTIONS,
+  },
+  "vendas-ghost-studio": {
+    name: "Vendas Ghost Studio",
+    description: "Loja completa dentro do Discord. Venda produtos digitais com entrega automática, estoque, cupons e painel administrativo tudo em um só bot.",
+    features: [
+      "Loja de produtos digitais no Discord",
+      "Entrega automática de produtos (.txt)",
+      "Sistema de cupons com desconto percentual",
+      "Carrinho de compras com threads privadas",
+      "Painel administrativo completo",
+      "Pagamento via Pix (QR Code)",
+      "Vitrine de produtos atualizada em tempo real",
+      "Rastreamento de pedidos",
+    ],
+    pricing: PRICING_OPTIONS,
+    ticketAddon: true,
+  },
+}
+
 async function getDefaultBots() {
   const { data } = await getBotSupabase()
     .from("settings")
@@ -391,29 +432,32 @@ createResponder({
         return interaction.editReply({ content: "Canal de vendas invalido ou nao encontrado." })
       }
 
-      const bots = await getDefaultBots()
-      const botMeta = bots.find((b: any) => b.slug === botSlug)
+      const botMeta = BOT_META[botSlug]
       if (!botMeta) {
-        return interaction.editReply({ content: "Bot nao encontrado nos settings." })
+        return interaction.editReply({ content: `Bot desconhecido: ${botSlug}` })
       }
 
+      const ticketLine = botMeta.ticketAddon
+        ? "\n**🎫 Addon Tickets** — +R$ 20,00 (opcional)"
+        : ""
+
       const embed = new EmbedBuilder()
-        .setTitle(`🛒 ${botMeta.name}`)
-        .setDescription(botMeta.description ?? "Adquira este bot para seu servidor")
+        .setTitle(`${BOT_ICONS[botSlug] ?? "🤖"} ${botMeta.name}`)
+        .setDescription(botMeta.description)
         .setColor(0xe11d48)
         .setImage(interaction.guild!.iconURL() ?? null)
         .addFields(
           {
             name: "✨ Funcionalidades",
-            value: ((botMeta.features as string[]) ?? [])
-              .map((f: string, i: number) => `**${i + 1}.** ${f}`)
-              .join("\n") || "Consulte o site",
+            value: botMeta.features
+              .map((f, i) => `**${i + 1}.** ${f}`)
+              .join("\n"),
           },
           {
             name: "💰 Planos",
-            value: (botMeta.pricing ?? PRICING_OPTIONS).map(
-              (p: any) => `**${p.label}** — R$ ${p.price.toFixed(2).replace(".", ",")}`
-            ).join("\n"),
+            value: botMeta.pricing.map(
+              (p) => `**${p.label}** — R$ ${p.price.toFixed(2).replace(".", ",")}`
+            ).join("\n") + ticketLine,
           },
           {
             name: "🏷️ Whitelabel",
@@ -423,9 +467,10 @@ createResponder({
             name: "🔧 Como funciona",
             value:
               "1. Selecione a duracao abaixo\n" +
-              "2. Escolha se quer whitelabel (sem marcas ARX)\n" +
-              "3. Pague via Pix (QR Code)\n" +
-              "4. Receba cargo de cliente + ativacao automatica",
+              "2. Escolha a source do bot\n" +
+              "3. Escolha se quer whitelabel (sem marcas ARX)\n" +
+              "4. Pague via Pix (QR Code)\n" +
+              "5. Receba cargo de cliente + bot ativado",
           }
         )
         .setFooter({ text: "ARX Store" })
@@ -434,10 +479,10 @@ createResponder({
         .setCustomId(`sales_buy:${botSlug}:${cfg.clienteRoleId}`)
         .setPlaceholder("Selecione a duracao...")
         .addOptions(
-          (botMeta.pricing ?? PRICING_OPTIONS).map((p: any) => ({
+          botMeta.pricing.map((p) => ({
             label: `${p.label} — R$ ${p.price.toFixed(2).replace(".", ",")}`,
-            value: `${p.duration ?? p.id}:${p.price}:${p.label}`,
-            emoji: (p.duration ?? p.id) === "lifetime" ? "⭐" : "💳",
+            value: `${p.id}:${p.price}:${p.label}`,
+            emoji: p.id === "lifetime" ? "⭐" : "💳",
           }))
         )
 
