@@ -24,9 +24,13 @@ const PRICING_OPTIONS = [
 ]
 
 const BOT_ICONS: Record<string, string> = {
-  ticket: "🎫",
-  invite: "📨",
-  mod: "🛡️",
+  "promisse-tickets": "🎫",
+  "vendas-ghost-studio": "🛒",
+}
+
+const BOT_LABELS: Record<string, string> = {
+  "promisse-tickets": "Promisse Tickets",
+  "vendas-ghost-studio": "Vendas Ghost Studio",
 }
 
 async function getDefaultBots() {
@@ -79,10 +83,10 @@ function buildMainPanel(configs: Record<string, SalesConfig>) {
   let currentRow = new ActionRowBuilder<ButtonBuilder>()
   let btnCount = 0
 
-  const botSlugs = ["ticket", "invite", "mod"]
+  const botSlugs = ["promisse-tickets", "vendas-ghost-studio"]
   for (const slug of botSlugs) {
     const cfg = configs[slug]
-    const label = `${BOT_ICONS[slug] ?? "🤖"} ${slug.charAt(0).toUpperCase() + slug.slice(1)}`
+    const label = `${BOT_ICONS[slug] ?? "🤖"} ${BOT_LABELS[slug] ?? slug}`
     const desc = cfg?.active
       ? `Ativo em <#${cfg.channelId}>`
       : "Nao configurado"
@@ -96,7 +100,7 @@ function buildMainPanel(configs: Record<string, SalesConfig>) {
     currentRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`mgr_bot:${slug}`)
-        .setLabel(slug.charAt(0).toUpperCase() + slug.slice(1))
+        .setLabel(BOT_LABELS[slug] ?? slug)
         .setStyle(cfg?.active ? ButtonStyle.Success : ButtonStyle.Secondary)
     )
     btnCount++
@@ -142,7 +146,7 @@ function buildMainPanel(configs: Record<string, SalesConfig>) {
 
 function buildBotPanel(botSlug: string, cfg: SalesConfig | undefined) {
   const icon = BOT_ICONS[botSlug] ?? "🤖"
-  const name = botSlug.charAt(0).toUpperCase() + botSlug.slice(1)
+  const name = BOT_LABELS[botSlug] ?? botSlug
 
   const embed = new EmbedBuilder()
     .setTitle(`${icon} Configurar — ${name} Bot`)
