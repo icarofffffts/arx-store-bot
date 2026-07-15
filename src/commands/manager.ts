@@ -26,11 +26,13 @@ const PRICING_OPTIONS = [
 const BOT_ICONS: Record<string, string> = {
   "promisse-tickets": "🎫",
   "vendas-ghost-studio": "🛒",
+  "custom_bot": "⭐",
 }
 
 const BOT_LABELS: Record<string, string> = {
   "promisse-tickets": "Promisse Tickets",
   "vendas-ghost-studio": "Vendas Ghost Studio",
+  "custom_bot": "Bot Personalizado",
 }
 
 interface BotMeta {
@@ -71,6 +73,18 @@ const BOT_META: Record<string, BotMeta> = {
     ],
     pricing: PRICING_OPTIONS,
     ticketAddon: true,
+  },
+  "custom_bot": {
+    name: "Bot Personalizado",
+    description: "Solicite um bot feito sob medida para suas necessidades exclusivas.",
+    features: [
+      "Desenvolvimento sob demanda (API, Banco de Dados, etc)",
+      "Você descreve o que precisa",
+      "Nós fazemos um orçamento justo",
+      "Após pagamento, desenvolvemos e entregamos",
+      "Garantia e suporte técnico",
+    ],
+    pricing: [],
   },
 }
 
@@ -124,7 +138,7 @@ function buildMainPanel(configs: Record<string, SalesConfig>) {
   let currentRow = new ActionRowBuilder<ButtonBuilder>()
   let btnCount = 0
 
-  const botSlugs = ["promisse-tickets", "vendas-ghost-studio"]
+  const botSlugs = ["promisse-tickets", "vendas-ghost-studio", "custom_bot"]
   for (const slug of botSlugs) {
     const cfg = configs[slug]
     const label = `${BOT_ICONS[slug] ?? "🤖"} ${BOT_LABELS[slug] ?? slug}`
@@ -150,19 +164,6 @@ function buildMainPanel(configs: Record<string, SalesConfig>) {
       rows.push(currentRow)
       currentRow = new ActionRowBuilder<ButtonBuilder>()
     }
-  }
-
-  currentRow.addComponents(
-    new ButtonBuilder()
-      .setCustomId("mgr_custom")
-      .setLabel("⭐ Personalizado")
-      .setStyle(ButtonStyle.Primary)
-  )
-  btnCount++
-
-  if (btnCount % 2 === 0) {
-    rows.push(currentRow)
-    currentRow = new ActionRowBuilder<ButtonBuilder>()
   }
 
   if (currentRow.components.length > 0) {
@@ -437,6 +438,41 @@ createResponder({
         return interaction.editReply({ content: `Bot desconhecido: ${botSlug}` })
       }
 
+      if (botSlug === "custom_bot") {
+        const embed = new EmbedBuilder()
+          .setTitle(`${BOT_ICONS[botSlug] ?? "⭐"} ${botMeta.name}`)
+          .setDescription(botMeta.description)
+          .setColor(0xf59e0b)
+          .setImage(interaction.guild!.iconURL() ?? null)
+          .addFields(
+            {
+              name: "📋 Como funciona",
+              value: botMeta.features
+                .map((f, i) => `**${i + 1}.** ${f}`)
+                .join("\n"),
+            }
+          )
+          .setFooter({ text: "ARX Store - Orcamentos" })
+
+        const btn = new ButtonBuilder()
+          .setCustomId(`sales_ticket_open:${cfg.clienteRoleId}`)
+          .setLabel("Solicitar Orcamento")
+          .setEmoji("🎫")
+          .setStyle(ButtonStyle.Success)
+
+        const msg = await (channel as any).send({
+          embeds: [embed],
+          components: [new ActionRowBuilder<ButtonBuilder>().addComponents(btn)],
+        })
+
+        configs[botSlug].messageId = msg.id
+        await saveSalesConfig(interaction.guildId!, configs)
+
+        return interaction.editReply({
+          content: `✅ Anuncio de **${botMeta.name}** postado em ${channel}!`,
+        })
+      }
+
       const ticketLine = botMeta.ticketAddon
         ? "\n**🎫 Addon Tickets** — +R$ 20,00 (opcional)"
         : ""
@@ -500,51 +536,6 @@ createResponder({
     } catch (err: any) {
       await interaction.editReply({ content: `Erro ao postar anuncio: ${err.message}` })
     }
-  },
-})
-
-createResponder({
-  scope: 'master',
-  customId: "mgr_custom",
-  types: ["Button"],
-  async run(interaction: any) {
-    const embed = new EmbedBuilder()
-      .setTitle("⭐ Bot Personalizado")
-      .setDescription(
-        "Solicite um bot feito sob medida para suas necessidades.\n\n" +
-        "**Como funciona:**\n" +
-        "1. Voce descreve o que precisa\n" +
-        "2. Nos fazemos um orcamento\n" +
-        "3. Apos pagamento, desenvolvemos e entregamos\n\n" +
-        "Use o botao abaixo para abrir um chamado de orcamento."
-      )
-      .setColor(0xf59e0b)
-
-    const btn = new ButtonBuilder()
-      .setCustomId("mgr_custom_order")
-      .setLabel("Solicitar Orcamento")
-      .setStyle(ButtonStyle.Success)
-
-    await interaction.reply({
-      embeds: [embed],
-      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(btn)],
-      ephemeral: true,
-    })
-  },
-})
-
-createResponder({
-  scope: 'master',
-  customId: "mgr_custom_order",
-  types: ["Button"],
-  async run(interaction: any) {
-    const channel = interaction.channel
-    await interaction.reply({
-      content:
-        "Para solicitar um bot personalizado, abra um ticket no nosso Discord de suporte ou " +
-        `acesse o site. Envie sua ideia neste canal ${channel} que nossa equipe entrara em contato.`,
-      ephemeral: true,
-    })
   },
 })
 
