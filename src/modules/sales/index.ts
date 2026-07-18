@@ -319,17 +319,23 @@ createResponder({
     await updateOrder(order.id, { mp_payment_id: String(pixResult.id), status: "awaiting_payment" })
 
     const qrEmbed = new EmbedBuilder()
-      .setTitle("📱 Pague com Pix")
-      .setColor(0xe11d48)
+      .setTitle("⏳ Aguardando Pagamento Pix")
+      .setColor(0xf59e0b)
       .setDescription(
         `**${botMeta?.name ?? botSlug}**\n` +
         `${label}${whitelabel ? " (Whitelabel)" : ""}\n\n` +
-        `**Valor:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n\n` +
-        "Escaneie o QR Code com o app do seu banco.\n" +
-        "O QR Code expira em 30 minutos.\n\n" +
-        `**Pedido:** #${(order.id as string).slice(0, 8)}`
+        `**Valor:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n` +
+        `**Pedido:** #${(order.id as string).slice(0, 8)}\n\n` +
+        "O QR Code expira em **30 minutos**. Pague agora!\n\n" +
+        (pixResult.copyPaste ? `\`\`\`\n${pixResult.copyPaste}\n\`\`\`` : "")
       )
-      .setFooter({ text: "Aguardando pagamento..." })
+      .setFooter({ text: "Escaneie o QR Code ou cole o codigo acima no app do banco" })
+      .setImage("attachment://pix.png")
+
+    const refreshBtn = new ButtonBuilder()
+      .setCustomId(`sales_payment_status:${order.id}`)
+      .setLabel("Verificar Pagamento")
+      .setStyle(ButtonStyle.Secondary)
 
     const files: AttachmentBuilder[] = []
     if (pixResult.qrCodeBase64) {
@@ -339,6 +345,7 @@ createResponder({
     await interaction.editReply({
       embeds: [qrEmbed],
       files,
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(refreshBtn)],
     })
 
     pollPayment({
@@ -418,17 +425,23 @@ createResponder({
     await updateOrder(order.id, { mp_payment_id: String(pixResult.id), status: "awaiting_payment" })
 
     const qrEmbed = new EmbedBuilder()
-      .setTitle("📱 Pague com Pix")
-      .setColor(0xe11d48)
+      .setTitle("⏳ Aguardando Pagamento Pix")
+      .setColor(0xf59e0b)
       .setDescription(
         `**${botMeta?.name ?? botSlug}**\n` +
         `${label}${whitelabel ? " (Whitelabel)" : ""}${ticketEnabled ? " +Ticket" : ""}\n\n` +
-        `**Valor:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n\n` +
-        "Escaneie o QR Code com o app do seu banco.\n" +
-        "O QR Code expira em 30 minutos.\n\n" +
-        `**Pedido:** #${(order.id as string).slice(0, 8)}`
+        `**Valor:** R$ ${totalPrice.toFixed(2).replace(".", ",")}\n` +
+        `**Pedido:** #${(order.id as string).slice(0, 8)}\n\n` +
+        "O QR Code expira em **30 minutos**. Pague agora!\n\n" +
+        (pixResult.copyPaste ? `\`\`\`\n${pixResult.copyPaste}\n\`\`\`` : "")
       )
-      .setFooter({ text: "Aguardando pagamento..." })
+      .setFooter({ text: "Escaneie o QR Code ou cole o codigo acima no app do banco" })
+      .setImage("attachment://pix.png")
+
+    const refreshBtn = new ButtonBuilder()
+      .setCustomId(`sales_payment_status:${order.id}`)
+      .setLabel("Verificar Pagamento")
+      .setStyle(ButtonStyle.Secondary)
 
     const files: AttachmentBuilder[] = []
     if (pixResult.qrCodeBase64) {
@@ -438,6 +451,7 @@ createResponder({
     await interaction.editReply({
       embeds: [qrEmbed],
       files,
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(refreshBtn)],
     })
 
     pollPayment({
@@ -491,6 +505,102 @@ createResponder({
     )
 
     await interaction.showModal(modal)
+  },
+})
+
+createResponder({
+  scope: 'master',
+  customId: "sales_payment_status:**",
+  types: ["Button"],
+  async run(interaction: any) {
+    const orderId = interaction.customId.split(":")[1]
+
+    const { data: order } = await getBotSupabase()
+      .from("custom_bot_orders")
+      .select("id, status, mp_payment_id, metadata")
+      .eq("id", orderId)
+      .maybeSingle()
+
+    if (!order) {
+      return interaction.reply({ content: "Pedido nao encontrado.", ephemeral: true })
+    }
+
+    if (order.status === "paid" || order.status === "deployed") {
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Pagamento Confirmado!")
+        .setColor(0x22c55e)
+        .setDescription("Seu pagamento ja foi confirmado! Clique abaixo para ativar seu bot.")
+
+      const activateBtn = new ButtonBuilder()
+        .setCustomId(`activate_bot:${orderId}`)
+        .setLabel("🚀 Ativar Bot")
+        .setStyle(ButtonStyle.Success)
+
+      return interaction.update({
+        embeds: [embed],
+        components: [new ActionRowBuilder<ButtonBuilder>().addComponents(activateBtn)],
+      })
+    }
+
+    if (order.status === "cancelled" || order.status === "refunded") {
+      const embed = new EmbedBuilder()
+        .setTitle("❌ Pagamento Expirado/Cancelado")
+        .setColor(0xdc2626)
+        .setDescription("Este pagamento expirou ou foi cancelado. Inicie uma nova compra.")
+
+      return interaction.update({ embeds: [embed], components: [] })
+    }
+
+    if (order.mp_payment_id) {
+      try {
+        const mpStatus = await getPaymentStatus(parseInt(order.mp_payment_id))
+        if (mpStatus === "approved") {
+          await getBotSupabase()
+            .from("custom_bot_orders")
+            .update({ status: "paid" })
+            .eq("id", orderId)
+
+          const embed = new EmbedBuilder()
+            .setTitle("✅ Pagamento Confirmado!")
+            .setColor(0x22c55e)
+            .setDescription("Recebemos seu pagamento! Clique abaixo para ativar seu bot.")
+
+          const activateBtn = new ButtonBuilder()
+            .setCustomId(`activate_bot:${orderId}`)
+            .setLabel("🚀 Ativar Bot")
+            .setStyle(ButtonStyle.Success)
+
+          return interaction.update({
+            embeds: [embed],
+            components: [new ActionRowBuilder<ButtonBuilder>().addComponents(activateBtn)],
+          })
+        }
+      } catch {}
+    }
+
+    const meta = typeof order.metadata === "string" ? JSON.parse(order.metadata) : (order.metadata ?? {})
+
+    const embed = new EmbedBuilder()
+      .setTitle("⏳ Aguardando Pagamento Pix")
+      .setColor(0xf59e0b)
+      .setDescription(
+        `**Pedido:** #${(orderId as string).slice(0, 8)}\n` +
+        `**Valor:** R$ ${(meta.total_price ?? 0).toFixed(2).replace(".", ",")}\n\n` +
+        "O pagamento ainda nao foi confirmado.\n" +
+        "Verifique se o Pix foi realizado corretamente.\n\n" +
+        "O QR Code expira em **30 minutos**."
+      )
+      .setFooter({ text: "Se ja pagou, aguarde ate 1 minuto para confirmacao" })
+
+    const retryBtn = new ButtonBuilder()
+      .setCustomId(`sales_payment_status:${orderId}`)
+      .setLabel("Verificar Novamente")
+      .setStyle(ButtonStyle.Secondary)
+
+    return interaction.update({
+      embeds: [embed],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(retryBtn)],
+    })
   },
 })
 
