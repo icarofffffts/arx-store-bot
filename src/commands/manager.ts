@@ -277,7 +277,11 @@ createResponder({
   customId: "mgr_bot:**",
   types: ["Button"],
   async run(interaction: any) {
-    const botSlug = interaction.customId.split(":")[1]
+    const parts = interaction.customId.split(":")
+    const botSlug = parts[1]
+    if (!botSlug || !/^[a-z0-9_-]{1,64}$/.test(botSlug)) {
+      return interaction.reply({ content: "Invalid bot slug.", ephemeral: true })
+    }
     const configs = await getSalesConfig(interaction.guildId!)
     const cfg = configs[botSlug]
     const { embed, rows } = buildBotPanel(botSlug, cfg)
@@ -301,7 +305,11 @@ createResponder({
   customId: "mgr_channel:**",
   types: ["Button"],
   async run(interaction: any) {
-    const botSlug = interaction.customId.split(":")[1]
+    const parts = interaction.customId.split(":")
+    const botSlug = parts[1]
+    if (!botSlug || !/^[a-z0-9_-]{1,64}$/.test(botSlug)) {
+      return interaction.reply({ content: "Invalid bot slug.", ephemeral: true })
+    }
 
     const select = new ChannelSelectMenuBuilder()
       .setCustomId(`mgr_channelselect:${botSlug}`)
@@ -321,11 +329,18 @@ createResponder({
   customId: "mgr_channelselect:**",
   types: ["ChannelSelect"],
   async run(interaction: any) {
-    const botSlug = interaction.customId.split(":")[1]
+    const parts = interaction.customId.split(":")
+    const botSlug = parts[1]
     const channelId = interaction.values[0]
+    if (!botSlug || !/^[a-z0-9_-]{1,64}$/.test(botSlug)) {
+      return interaction.reply({ content: "Invalid bot slug.", ephemeral: true })
+    }
+    if (!channelId || !/^\d{17,20}$/.test(channelId)) {
+      return interaction.reply({ content: "Invalid channel.", ephemeral: true })
+    }
     console.log(`[Manager] channelselect: botSlug=${botSlug}, channelId=${channelId}`)
     const configs = await getSalesConfig(interaction.guildId!)
-    const cfg = configs[botSlug]
+    const cfg = (configs[botSlug] ?? {}) as SalesConfig
     console.log(`[Manager] channelselect: existing cfg for ${botSlug}:`, JSON.stringify(cfg))
 
     const hasRole = !!cfg?.clienteRoleId
@@ -358,7 +373,11 @@ createResponder({
   customId: "mgr_role:**",
   types: ["Button"],
   async run(interaction: any) {
-    const botSlug = interaction.customId.split(":")[1]
+    const parts = interaction.customId.split(":")
+    const botSlug = parts[1]
+    if (!botSlug || !/^[a-z0-9_-]{1,64}$/.test(botSlug)) {
+      return interaction.reply({ content: "Invalid bot slug.", ephemeral: true })
+    }
 
     const select = new RoleSelectMenuBuilder()
       .setCustomId(`mgr_roleselect:${botSlug}`)
@@ -377,11 +396,18 @@ createResponder({
   customId: "mgr_roleselect:**",
   types: ["RoleSelect"],
   async run(interaction: any) {
-    const botSlug = interaction.customId.split(":")[1]
+    const parts = interaction.customId.split(":")
+    const botSlug = parts[1]
     const roleId = interaction.values[0]
+    if (!botSlug || !/^[a-z0-9_-]{1,64}$/.test(botSlug)) {
+      return interaction.reply({ content: "Invalid bot slug.", ephemeral: true })
+    }
+    if (!roleId || !/^\d{17,20}$/.test(roleId)) {
+      return interaction.reply({ content: "Invalid role.", ephemeral: true })
+    }
     console.log(`[Manager] roleselect: botSlug=${botSlug}, roleId=${roleId}`)
     const configs = await getSalesConfig(interaction.guildId!)
-    const cfg = configs[botSlug]
+    const cfg = (configs[botSlug] ?? {}) as SalesConfig
     console.log(`[Manager] roleselect: existing cfg for ${botSlug}:`, JSON.stringify(cfg))
 
     const hasChannel = !!cfg?.channelId
@@ -414,7 +440,11 @@ createResponder({
   customId: "mgr_post:**",
   types: ["Button"],
   async run(interaction: any) {
-    const botSlug = interaction.customId.split(":")[1]
+    const parts = interaction.customId.split(":")
+    const botSlug = parts[1]
+    if (!botSlug || !/^[a-z0-9_-]{1,64}$/.test(botSlug)) {
+      return interaction.reply({ content: "Invalid bot slug.", ephemeral: true })
+    }
     const configs = await getSalesConfig(interaction.guildId!)
     const cfg = configs[botSlug]
 
@@ -603,6 +633,9 @@ createResponder({
     }
 
     const orderId = interaction.values[0]
+    if (!orderId || orderId.length > 100) {
+      return interaction.reply({ content: "Invalid order.", ephemeral: true })
+    }
 
     const { data: order } = await getBotSupabase()
       .from("custom_bot_orders")
