@@ -62,13 +62,13 @@ createCommand({
       if (!user) {
         embed.addFields({
           name: '⚠️ Conta Necessaria',
-          value: 'Voce precisa vincular sua conta do Discord no site primeiro:\nhttps://arx.store/login\n\nSem vincular, nao e possivel comprar ou ativar bots.',
+          value: 'Voce precisa vincular sua conta do Discord no site primeiro:\nhttps://store.arxdevs.shop/login\n\nSem vincular, nao e possivel comprar ou ativar bots.',
           inline: false,
         })
       } else if (!user.email) {
         embed.addFields({
           name: '⚠️ Email Necessario',
-          value: 'Sua conta nao tem email vinculado. Adicione um email no site para comprar via Pix:\nhttps://arx.store/dashboard/settings\n\nDepois de adicionar, volte aqui para comprar.',
+          value: 'Sua conta nao tem email vinculado. Adicione um email no site para comprar via Pix:\nhttps://store.arxdevs.shop/dashboard/settings\n\nDepois de adicionar, volte aqui para comprar.',
           inline: false,
         })
       }

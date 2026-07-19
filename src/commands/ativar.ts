@@ -77,7 +77,7 @@ createCommand({
       const user = await getUserByDiscordId(interaction.user.id)
       if (!user) {
         return interaction.reply({
-          content: 'Voce precisa ter uma conta na ARX Store para ativar bots.\nCrie sua conta em: https://arx.store',
+          content: 'Voce precisa ter uma conta na ARX Store para ativar bots.\nCrie sua conta em: https://store.arxdevs.shop',
           ephemeral: true,
         })
       }

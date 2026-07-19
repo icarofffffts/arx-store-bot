@@ -37,7 +37,7 @@ createCommand({
           .addFields(
             { name: 'Status', value: '🆓 Free', inline: true },
             { name: 'Preco', value: 'R$ 0,00', inline: true },
-            { name: 'Upgrade', value: '[Ver planos disponiveis](https://arx.store/planos)', inline: false },
+            { name: 'Upgrade', value: '[Ver planos disponiveis](https://store.arxdevs.shop/dashboard/planos)', inline: false },
           )
           .setColor(colors.neutral)
         return interaction.reply({ embeds: [embed] })

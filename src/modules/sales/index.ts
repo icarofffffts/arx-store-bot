@@ -280,12 +280,12 @@ createResponder({
     const user = await getUserByDiscordId(interaction.user.id)
     if (!user) {
       return interaction.editReply({
-        content: "❌ **Conta nao vinculada**\n\nVoce precisa criar uma conta na ARX Store primeiro.\n👉 Acesse: https://arx.store/login e entre com seu Discord.\n\nDepois de vincular, volte aqui para comprar.",
+        content: "❌ **Conta nao vinculada**\n\nVoce precisa criar uma conta na ARX Store primeiro.\n👉 Acesse: https://store.arxdevs.shop/login e entre com seu Discord.\n\nDepois de vincular, volte aqui para comprar.",
       })
     }
     if (!user.email) {
       return interaction.editReply({
-        content: "❌ **Email necessario**\n\nSua conta precisa ter um email vinculado para gerar o Pix.\n👉 Acesse: https://arx.store/dashboard/settings e adicione seu email.\n\nDepois de adicionar, volte aqui para comprar.",
+        content: "❌ **Email necessario**\n\nSua conta precisa ter um email vinculado para gerar o Pix.\n👉 Acesse: https://store.arxdevs.shop/dashboard/settings e adicione seu email.\n\nDepois de adicionar, volte aqui para comprar.",
       })
     }
 
