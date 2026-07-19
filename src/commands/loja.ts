@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js'
 import { createCommand, colors } from '../base'
 import { getBotSupabase } from '../utils/supabase'
-import { getGuildBots, getAvailablePlans } from '../utils/store-queries'
+import { getGuildBots, getAvailablePlans, getUserByDiscordId } from '../utils/store-queries'
 
 interface BotDefinition {
   name: string
@@ -19,6 +19,7 @@ createCommand({
     .setDescription('Ve os bots disponiveis na ARX Store'),
   async run(interaction) {
     try {
+      const user = await getUserByDiscordId(interaction.user.id)
       const { data, error } = await getBotSupabase()
         .from('settings')
         .select('value')
@@ -57,6 +58,20 @@ createCommand({
         .setDescription('Confira os bots disponiveis para ativar no seu servidor:')
         .setColor(colors.primary)
         .setFooter({ text: 'Use /ativar para ativar um bot no seu servidor' })
+
+      if (!user) {
+        embed.addFields({
+          name: '⚠️ Conta Necessaria',
+          value: 'Voce precisa vincular sua conta do Discord no site primeiro:\nhttps://arx.store/login\n\nSem vincular, nao e possivel comprar ou ativar bots.',
+          inline: false,
+        })
+      } else if (!user.email) {
+        embed.addFields({
+          name: '⚠️ Email Necessario',
+          value: 'Sua conta nao tem email vinculado. Adicione um email no site para comprar via Pix:\nhttps://arx.store/dashboard/settings\n\nDepois de adicionar, volte aqui para comprar.',
+          inline: false,
+        })
+      }
 
       for (const bot of bots) {
         const alreadyActive = activeSlugs.has(bot.slug)
